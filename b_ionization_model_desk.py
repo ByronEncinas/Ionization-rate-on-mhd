@@ -346,10 +346,10 @@ def ColumnDensity(sf, mu):
 
         gaspos = index[i]  # Position for s in structured grid
         gasden = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density
-
         Bsprime = bmag[i]
         
-        print(gasden, gas_den[i][i][i])
+        #print(gasden, gas_den[i][i][i])
+        
         try:
             bdash = Bsprime / Bats  # Ratio of magnetic field strengths
             one_over = 1.0 / np.sqrt(1 - bdash * (1 - mu**2))  # Reciprocal of the square root term

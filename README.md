@@ -2,9 +2,9 @@
 
 ## Description
 
-A brief description of your project.
+Study of Cosmic Ray Ionization rates at magnetic pockets
 
-## Features
+## Files
 
 - [ ] Update s-coordinate using x,y,z data on scale (cgs units)
 - [ ] Apply Ionization zeta_+ function on 

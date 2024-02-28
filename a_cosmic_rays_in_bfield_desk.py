@@ -729,6 +729,10 @@ try:
 except:
   print("Not Possible to plot")
 
+try:
+  plot_trajectory_versus_magnitude(timestep,line_segment_n,  ["Cosmic Ray Density in Path", "CRs Density", "s-coordinate"])
+except:
+  print("Not Possible to plot")
 
 """ 
 try:
