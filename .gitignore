@@ -1,0 +1,16 @@
+# folders
+__py*
+a_output*
+b_output*
+c_output*
+input_data
+.vscode
+
+# png
+*.png
+*.txt
+
+#executables
+*.c
+runner.py
+setup.py
