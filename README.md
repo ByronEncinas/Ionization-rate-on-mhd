@@ -2,14 +2,12 @@
 
 ## Description
 
-Study of Cosmic Ray Ionization rates at magnetic pockets
+Study of Cosmic Ray Ionization rates along particle motion
 
 ## Files
 
-- [ ] Update s-coordinate using x,y,z data on scale (cgs units)
-- [ ] Apply Ionization zeta_+ function on 
-    - [ ] Obtain N+
-- [ ] read Nesfald and Wolfe 2017
+- [ ] b_*.py takes filename as argument
+- [ ] Apply Ionization zeta_+ function on parallel
 
 ## Usage
 

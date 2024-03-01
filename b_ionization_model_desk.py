@@ -5,7 +5,7 @@ from scipy.signal import find_peaks
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
 import pandas as pd
-
+import sys
 """  
 Methods
 """
@@ -255,7 +255,8 @@ def process_line(line):
 global itera, scoord, posit, bmag
 
 # Specify the file path
-file_path = 'critical_points.txt'
+#file_path = 'critical_points.txt'
+file_path = sys.argv[1]
 
 # Displaying a message about reading from the file
 with open(file_path, 'r') as file:
@@ -347,9 +348,7 @@ def ColumnDensity(sf, mu):
         gaspos = index[i]  # Position for s in structured grid
         gasden = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density
         Bsprime = bmag[i]
-        
-        #print(gasden, gas_den[i][i][i])
-        
+                
         try:
             bdash = Bsprime / Bats  # Ratio of magnetic field strengths
             one_over = 1.0 / np.sqrt(1 - bdash * (1 - mu**2))  # Reciprocal of the square root term
@@ -358,7 +357,7 @@ def ColumnDensity(sf, mu):
 
         dColumnDensity += gasden * one_over  # Accumulate the contribution to column density
 
-    print(dColumnDensity, gasden)
+        #print(gasden, dColumnDensity, one_over)
 
     return dColumnDensity, gasden
 
@@ -408,8 +407,20 @@ def Jcurr(Ei, E, mu, s, ds, cd):
     - list: Three approximations of J(E, mu, s) based on different cases.
     """
     try:
+
+        # Calculate Jcurr using the PowerLaw function
+        Jcurr = PowerLaw(Estar, Ei, a, Jstar) * PowerLaw(Estar, Ei, d, Lstar) / PowerLaw(Estar, E, d, Lstar)
+
+        # Approximations:
+        # Case 1: E >> Estar => Ji(Ei) ~ J(E)
+        Jcurr_one = PowerLaw(Estar, E, a, Jstar) #* PowerLaw(Estar, Ei, d, Lstar)
+
+        # Case 2: E << Estar => Ji(Ei) ~ J(Estar)
+        E__ = 1 + (1+d) * ((Lstar * (1 + d) * Estar * cd)** (1/ 1 + d))* E**d
+        
+        Jcurr_two = PowerLaw(Estar, E__, a, Jstar) * PowerLaw(Estar, Ei, d, Lstar)
+
         # Calculate energy using the Energy function
-        pass
         #E = Energy(Ei, mu, s, ds, d)
     except Exception as e:
         # Catch potential issues with Energy() function
@@ -417,19 +428,7 @@ def Jcurr(Ei, E, mu, s, ds, cd):
         print("Energy() has issues")
         exit()
 
-    # Calculate Jcurr using the PowerLaw function
-    Jcurr = PowerLaw(Estar, Ei, a, Jstar) * PowerLaw(Estar, Ei, d, Lstar) / PowerLaw(Estar, E, d, Lstar)
-
-    # Approximations:
-    # Case 1: E >> Estar => Ji(Ei) ~ J(E)
-    Jcurr_one = PowerLaw(Estar, E, a, Jstar) #* PowerLaw(Estar, Ei, d, Lstar)
-
-    # Case 2: E << Estar => Ji(Ei) ~ J(Estar)
-    E__ = 1 + (1+d) * ((Lstar * (1 + d) * Estar * cd)** (1/ 1 + d))* E**d
-    
-    Jcurr_two = PowerLaw(Estar, E__, a, Jstar) * PowerLaw(Estar, Ei, d, Lstar)
-
-    return Jcurr, Jcurr_one, Jcurr_two, cd
+    return Jcurr
 
 """ Ionization Calculation
 
@@ -445,7 +444,7 @@ def Ionization(sf):
     #data_size = list(range(len(scoord)))
     
     # 1.60218e-6 ergs (1 MeV = 1.0 eV)
-    Ei = 1.0e+6 # eV Ei
+    Ei = 1.0e+6 # eV
     Ef = 1.0e+9
     
     # ten thousand of precision to try
@@ -457,43 +456,51 @@ def Ionization(sf):
 
     # 0.0 < pitch < np.pi
     da = np.pi/data_size
-    a = reversed([da*j for j in range(data_size)])
+    a = [da*j for j in range(data_size)]
     
-    dIo = 0.0
-    print("Initial Conditions")
-    #print(data_size, Ei, dE, da, dmu)
     testo = []
 
-    for ai in a: 
-        mui = np.cos(ai)
-        #print(mui, ai, dIo)
+    dIo = 0.0
+
+    print("Initial Conditions")
+    print(("Size", "Init Energy (eV)", "Energy Diff (eV)", "Pitch A. Diff", "\mu Diff"), "\n")
+    print(data_size, Ei, dE, da, dmu,"\n")
+    
+
+    a = a[1:len(a)//3]
+
+    for ang_i in a: 
         
-            # Calculate column density using the provided function
+        mui = np.cos(ang_i)
+        
+        # Calculate column density using the provided function
         data = ColumnDensity(sf, mui)
         gasden = data[1]
         cd = data[0]
         
-
-        dIo += dIo*np.sin(ai)*da # Ionization Differential
+        # Ionization Differential
+        #dIo += dIo*np.sin(ang_i)*da
 
         E = Ei
 
-        CurrentCaseZero  = []#J[0]#np.log10(J[0]) # Current using model
-        CurrentCaseOne   = []#J[1]#np.log10(J[1]) # # Case 1: E >> Estar => Ji(Ei) ~ J(E)
-        CurrentCaseTwo   = []#J[2]#np.log10(J[2]) # Case 2: E << Estar => Ji(Ei) ~ J(Estar)
-        Energies = []#J[3]# np.log10(J[3]) # Coolumn Density at s
+        Current    = []
+        Energies   = []
+        Ionization = []
+        
+        print(("Ionization (s)", "Current J(\mu,s,E)", "Energy", "Column Density") )
 
-        for i, sc in enumerate(scoord[1:]):
+        for k, sc in enumerate(scoord[1:]):
+            #print("{:<10} {:<10} {:<10} {:<10}".format(Ei, E, k, dE))
+
             if sc > sf: # stop calculation at s final point
                 break
-            
-            if i < 1:
+            if k < 1:
                 ds = scoord[1] - scoord[0]
             else:
-                ds = scoord[i] - scoord[i-1]
+                ds = scoord[k] - scoord[k-1]
 
             # E in 1 MeV => 1 GeV
-            E = Ei + i*dE
+            E = Ei + k*dE
 
             # E_exp = Ei^(1+d) = E^(1+d) + L_(1+d) N E_^d   
             E_exp = Energy(E, mui, sc, ds, cd, d) 
@@ -501,69 +508,66 @@ def Ionization(sf):
             # Current for J_+(E, mu, s)
             J = Jcurr(E_exp, E, mui, sc, ds, cd)
             
-            CurrentCaseZero.append(np.log10(J[0])) # Current using model
-            CurrentCaseOne.append(np.log10(J[1]))  # Case 1: E >> Estar => Ji(Ei) ~ J(E)
-            CurrentCaseTwo.append(np.log10(J[2]))  # Case 2: E << Estar => Ji(Ei) ~ J(Estar)
-            Energies.append(np.log10(E))           # Coolumn Density at s
-                   
-            #print(f"{i} Calculated value: {J[0]}, {J[1]},{J[0]},{E}, {cd}, {gasden} ")
+            # Current using model
+            Current.append(np.log10(J))    
+            
+            # Coolumn Density at s
+            Energies.append(np.log10(E))           
+            
             try:
-                dIo += 0.0# J*dE*np.sin(ai)*da
+                dIo += J*dE*np.sin(ang_i)*da
+                Ionization.append(dIo)         
             except Exception as e:
                 print(e)
                 print("Jcurr() has issues")
+            # dIo, J, ang_i, mui, E, cd
+            print("{:<10}  {:<10}  {:<10}  {:<10}  {:<10}  {:<10}".format(sc, dIo, J, ang_i, mui, E, cd))
 
         break
-
-    return (CurrentCaseZero , CurrentCaseOne, CurrentCaseTwo ,  Energies) #dIo
+        
+    return (Ionization, Current, Energies) 
 
 # Choose a test case for the streamline coordinate
 sf = scoord[1187]  # test case
 sf = scoord[-1]  # test case
 
 # Uncomment the line below if you want to test a different streamline coordinate
-sf = scoord[1186]  # test case
+#sf = scoord[1186]  # test case
 
 # Test Ionization function and print the result
 ionization_result = Ionization(sf)
 
-CurrentCaseZero = ionization_result[0] # Current using model
-CurrentCaseOne  = ionization_result[1] # # Case 1: E >> Estar => Ji(Ei) ~ J(E)
-CurrentCaseTwo  = ionization_result[2] # Case 2: E << Estar => Ji(Ei) ~ J(Estar)
-Energies  = ionization_result[3] # Coolumn Density at s
+Ionization = ionization_result[0] # Current using model
+Current  = ionization_result[1] # # Case 1: E >> Estar => Ji(Ei) ~ J(E)
+Energies  = ionization_result[2] # Case 2: E << Estar => Ji(Ei) ~ J(Estar)
 
 logscoord = [np.log10(s) for s in scoord[1:]]
 
-print(len(logscoord), len(CurrentCaseZero), len(CurrentCaseOne), len(CurrentCaseTwo))
-import matplotlib.pyplot as plt
-
 # Create a 1x3 subplot grid
-fig, axs = plt.subplots(3, 1, figsize=(8, 15))
+fig, axs = plt.subplots(2, 1, figsize=(8, 15))
 
 # Scatter plot for Case Zero
-axs[0].scatter(Energies, CurrentCaseZero, label='$J(\mu, s, E)$', marker='x', color='blue')
+axs[0].scatter(Energies, Current, label='$J(\mu, s, E)$', marker='x', color='blue')
+axs[1].scatter(scoord[1:], Ionization, label='$\zeta(s)$', marker='x', color='red')
 
-# Scatter plot for Case One
-axs[1].scatter(Energies, CurrentCaseOne, label='$E >> E_{**} \| J_i(E_i) ~ J_i(E)$', marker='*', color='green')
+axs[0].set_xlabel('$Log_{10}(E \ eV)$')
+axs[0].set_ylabel('$Log_{10}(J eV^{-1} cm^{-2} s^{-1} sr^{-1})$')
 
-# Scatter plot for Case Two
-axs[2].scatter(Energies, CurrentCaseTwo, label='$E << E_{**} \| J_i(E_i) ~ J(E_*)$', marker='+', color='red')
-axs[2].set_xlabel('$Log_{10}(E \ eV)$')
-
-# Set y-axis labels for all subplots
-for ax in axs:
-    ax.set_ylabel('$Log_{10}(J eV^{-1} cm^{-2} s^{-1} sr^{-1})$')
+axs[1].set_xlabel('$distance (cm)$')
+axs[1].set_ylabel('$\zeta(s)$')
 
 # Add legends to each subplot
 axs[0].legend()
 axs[1].legend()
-axs[2].legend()
 
 # Adjust layout for better spacing
 #plt.tight_layout()
 
 # Display the plot
 plt.show()
+
+# Save Figure
+plt.savefig("CurrentVsEnergyLogScale.png")
 
 # Characterization of the path - Find peaks in the trajectory
 x = bmag.copy()[1:]
@@ -578,7 +582,7 @@ print(peaks)
 
 # Plot the trajectory with peaks marked
 plt.plot(x)
-plt.hlines(maxes, xmin=0, xmax=len(scoord), color="grey", linestyle="--")
+plt.vlines(peaks, xmin=0, xmax=len(scoord), color="grey", linestyle="--")
 plt.plot(peaks, [x[i] for i in peaks], "x")
 plt.show()
 

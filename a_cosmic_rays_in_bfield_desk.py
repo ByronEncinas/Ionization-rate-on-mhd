@@ -326,7 +326,7 @@ def find_enclosing_scalars(i, j, k):
             scalars.append(np.array([np.floor(dx), np.floor(dy), np.floor(dz)]))
     return scalars
 
-def interpolate_scalar_field(p_i, p_j, p_k, scalar_field): # implementing Inverse Distance Weighting (Shepard's method)
+def interpolate_scalar_field(p_i, p_j, p_k, scalar_field, epsilon=1e-10): # implementing Inverse Distance Weighting (Shepard's method)
 
     
 
@@ -350,13 +350,13 @@ def interpolate_scalar_field(p_i, p_j, p_k, scalar_field): # implementing Invers
             #print(distance)
           
             # base case
-            if distance <= 0.001:
+            if distance <= epsilon:
                 #print(f"known scalar field at [{p_i},{p_j},{p_k}]")
                 return scalar_field[int(p_i)][int(p_j)][int(p_k)]
 
-            cum_sum += scalar_field[i][j][k]/ (distance + 1e-10) ** 2
+            cum_sum += scalar_field[i][j][k]/ (distance + epsilon) ** 2
             #print(scalar_field[i][j][k],(distance + 1e-10) ** 2)
-            cum_inv_dis += 1 / (distance + 1e-10) ** 2 
+            cum_inv_dis += 1 / (distance + epsilon) ** 2 
     else:
        new_coords = [[c[0],c[1],c[2]] for c in coordinates if all(ingrid(c[0],c[1],c[2]))]
        index = ingrid(p_i,p_j,p_k)
@@ -371,12 +371,12 @@ def interpolate_scalar_field(p_i, p_j, p_k, scalar_field): # implementing Invers
             #print(scalar_field[i][j][k],(distance + 1e-10) ** 2,np.exp(-distance))
             
             # base case
-            if distance <= 0.001:
+            if distance <= epsilon:
                 #print(f"known scalar field at [{p_i},{p_j},{p_k}]")
                 return scalar_field[int(p_i)][int(p_j)][int(p_k)]
             
-            cum_sum += scalar_field[i][j][k]*np.exp(-distance**(3)/8)/ (distance + 1e-10) ** 2
-            cum_inv_dis += 1 / (distance + 1e-10) ** 2 
+            cum_sum += scalar_field[i][j][k]*np.exp(-distance**(3)/8)/ (distance + epsilon) ** 2
+            cum_inv_dis += 1 / (distance + epsilon) ** 2 
             
     interpolated_scalar = cum_sum / cum_inv_dis
     return interpolated_scalar
@@ -524,7 +524,6 @@ def multiplot_trajectory_versus_magnitude(domain, legends,  *f ):
 
     plt.show()
 
-
 def plot_trajectory_versus_magnitude(line_segments, B_Fields, legends, save_path=None):
     '''
     legends = ["title", "y-coord", "x-coord"]
@@ -584,9 +583,10 @@ ds = DS
 # Magnetic Field, Point in grid and Points that enclose it
 margin = 3.0  # Adjust the margin as needed
 
-POINT_i = 78.9034467340914
-POINT_j = 75.00339571324305
-POINT_k = 31.08291110389184
+POINT_i = 82.0
+POINT_j = 13.9
+POINT_k = 12.8
+
 
 # Random Starting Point Y = 0
 if False:
@@ -625,8 +625,8 @@ bfield_magnitud_n = []                             # magnetic field at each s-di
 cr_density = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, cr_den)
 mc_density = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, gas_den)
 
-cr_den_n = []
-mc_den_n = []
+cr_den_n = [cr_density]
+mc_den_n = [mc_density]
 
 count = 0                                             # iterator count
 max_diff_bp = 0.0                                     # maximum magnetic field experienced
@@ -635,14 +635,12 @@ min_diff_bp = 0.0                                     # minimum magnetic field e
 starting_pos = '['+str(round(run_cur_pos[0],1)) +',' + str(round(run_cur_pos[1],1))+',' + str(round(run_cur_pos[2],1))+']'
 print("Initial Position: ", starting_pos)
 
-min_max = [(0.0, None)]
-
 """# Calculating Trajectory"""
 import os
 
-#os.mkdir(f"c_output_data/{starting_pos}_file")
-#with open(f"c_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt", "w") as run_data:
-with open(f"critical_points.txt", "w") as run_data: #tests
+os.mkdir(f"c_output_data/{starting_pos}_file")
+with open(f"c_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt", "w") as run_data:
+#with open(f"critical_points.txt", "w") as run_data: #tests
 
         for time in timestep:
             try:
@@ -655,9 +653,10 @@ with open(f"critical_points.txt", "w") as run_data: #tests
                 unito = Bp_run/bf_mag
 
                 #auxp = rk4_int(CONST, run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], Bx, By, Bz, delta)
-                run_cur_vel += Bp_run*delta           
-                run_cur_pos += run_cur_vel*delta # s is equally spaced now
-
+                #run_cur_vel += unito*delta  
+                run_cur_pos += unito*delta # s is equally spaced now
+                
+                print(count, magnitude(run_cur_pos,run_prev_pos))
                 follown.append(run_cur_pos.tolist())
 
                 xpos = interpolate_scalar_field(run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], x) 
@@ -672,8 +671,8 @@ with open(f"critical_points.txt", "w") as run_data: #tests
                 cr_density = interpolate_scalar_field(run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], cr_den)
                 mc_density = interpolate_scalar_field(run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], gas_den)
 
-                cr_avg = (cr_density+ sum(cr_den_n[-2:]))/3.0
-                mc_avg = (mc_density+ sum(mc_den_n[-2:]))/3.0
+                cr_avg = (cr_density + cr_den_n[-1]) / 2.0
+                mc_avg = (mc_density + mc_den_n[-1]) / 2.0
 
                 cr_den_n.append(cr_avg)
                 mc_den_n.append(mc_avg)
@@ -685,12 +684,6 @@ with open(f"critical_points.txt", "w") as run_data: #tests
                 print("Particle got out of the Grid")
 
                 break
-            
-            #print(run_cur_pos, " => ", run_prev_pos, " Subtract to: ", magnitude(run_cur_pos, run_prev_pos))
-            #print(realpos," => ", realprevpos)
-            #lin_seg += magnitude([realprevpos[index]-curpos for index, curpos in enumerate(realpos)]) # there is an issue here # 
-            #lin_seg += magnitude(run_cur_pos)
-            #realprevpos = [realpos[0], realpos[1], realpos[2]]
 
             lin_seg +=  magnitude(run_cur_pos, run_prev_pos)*scale_factor # centimeters
             run_prev_pos = run_cur_pos.copy()
@@ -715,29 +708,98 @@ print("RunggeKutta4: ",follown[0], "-->", run_cur_pos)
 
 print("Min, Max of B in trayectory: ", min_diff_bp, max_diff_bp)
 
+simulation_data = {
+   "Starting Position": tuple(follown[0]),
+   "Final Position": tuple(run_cur_pos),
+   "Timestep (Delta t)": delta,
+   "Method": "Runge Kutta 4, Second Order",
+   "B Field Min, Max": (min_diff_bp, max_diff_bp),
+   "Grid Size": f"{DS}x{DS}x{DS}"
+}
+
+"""# Scipy Interpolation for MC and CR data"""
+
+from scipy.optimize import curve_fit
+import numpy as np
+
+# Your data
+x = line_segment_n.copy()
+y_mc = mc_den_n[1:].copy()
+y_cr = cr_den_n[1:].copy()
+
+# Define a fourth-degree polynomial function
+def fourth_degree_polynomial(x, a, b, c, d, e):
+    return a * x**4 + b * x**3 + c * x**2 + d * x + e
+
+# Use curve_fit to fit the fourth-degree polynomial model to the data (for mc_den_n)
+params_mc, covariance_mc = curve_fit(fourth_degree_polynomial, x, y_mc)
+
+# Extract the parameters for mc_den_n
+a_mc, b_mc, c_mc, d_mc, e_mc = params_mc
+
+# Generate some points for the fitted fourth-degree polynomial curve (for mc_den_n)
+x_fitted = np.linspace(min(x), max(x), len(x))
+y_mc_fitted = fourth_degree_polynomial(x_fitted, a_mc, b_mc, c_mc, d_mc, e_mc)
+
+# Use curve_fit to fit the fourth-degree polynomial model to the data (for cr_den_n)
+params_cr, covariance_cr = curve_fit(fourth_degree_polynomial, x, y_cr)
+
+# Extract the parameters for cr_den_n
+a_cr, b_cr, c_cr, d_cr, e_cr = params_cr
+
+# Generate some points for the fitted fourth-degree polynomial curve (for cr_den_n)
+y_cr_fitted = fourth_degree_polynomial(x_fitted, a_cr, b_cr, c_cr, d_cr, e_cr)
+
+
 """# Graphs"""
 
 ''' print(len(line_segment_n),len(bfield_magnitud_n))  '''
 
 try:
   plot_trajectory_versus_magnitude(line_segment_n,bfield_magnitud_n, ["B Field Density in Path", "B-Magnitude", "s-coordinate"])
-except:
+  plot_trajectory_versus_magnitude(line_segment_n,mc_den_n[1:], ["Molecular Cloud Density in Path", "MC Density", "s-coordinate"])
+  plot_trajectory_versus_magnitude(line_segment_n,cr_den_n[1:], ["Cosmic Ray Density in Path", "CR Density", "s-coordinate"])
+  
+  # Create a 1x3 subplot grid
+  fig, axs = plt.subplots(3, 1, figsize=(10, 15))
+
+  # Scatter plot for Case Zero
+  axs[0].scatter(line_segment_n,bfield_magnitud_n, label='$B(s)$', marker='x', color='blue')
+  
+  axs[1].scatter(line_segment_n,mc_den_n[1:], label='$Cloud$', marker='+', color='green')
+  axs[1].plot(x_fitted,y_mc_fitted, label='$Cloud$', linestyle='--', color='black')
+
+  axs[2].scatter(line_segment_n,cr_den_n[1:], label='$CRs$', marker='*', color='red')
+  axs[2].plot(x_fitted, y_cr_fitted, label='$CRs$', linestyle='--', color='black')
+
+
+  axs[0].set_xlabel('$Log_{10}(E \ eV)$')
+  axs[0].set_ylabel('$Log_{10}(J eV^{-1} cm^{-2} s^{-1} sr^{-1})$')
+
+  axs[1].set_xlabel('$distance (cm)$')
+  axs[1].set_ylabel('$MC Density gr/cm^3$')
+
+  axs[2].set_xlabel('$distance (cm)$')
+  axs[2].set_ylabel('$CR Density gr/cm^3$')
+
+  # Add legends to each subplot
+  axs[0].legend()
+  axs[1].legend()
+  axs[2].legend()
+
+  # Adjust layout for better spacing
+  #plt.tight_layout()
+
+  # Save Figure
+  plt.savefig(f"c_output_data/{starting_pos}_file/CurrentVsEnergyLogScale.png")
+
+  # Display the plot
+  plt.show()
+
+
+except Exception as e:
+  print(e)
   print("Not Possible to plot")
 
-try:
-  plot_trajectory_versus_magnitude(line_segment_n,mc_den_n, ["Molecular Cloud Density in Path", "MC Density", "s-coordinate"])
-except:
-  print("Not Possible to plot")
-
-try:
-  plot_trajectory_versus_magnitude(timestep,line_segment_n,  ["Cosmic Ray Density in Path", "CRs Density", "s-coordinate"])
-except:
-  print("Not Possible to plot")
-
-""" 
-try:
-  plot_trajectory_versus_magnitude(line_segment_n,cr_den_n,  ["Cosmic Ray Density in Path", "CRs Density", "s-coordinate"])
-except:
-  print("Not Possible to plot")
- """
+print(f"c_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt")
 
