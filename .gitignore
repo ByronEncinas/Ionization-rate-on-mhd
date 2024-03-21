@@ -14,3 +14,4 @@ input_data
 *.c
 runner.py
 setup.py
+spectrum.py

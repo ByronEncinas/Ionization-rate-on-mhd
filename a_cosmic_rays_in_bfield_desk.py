@@ -118,8 +118,6 @@ scale_factor += magnitude(relativepos)
 
 scale_factor /= 3.0 
 
-print(scale_factor)
-
 """### Constants and Parameters"""
 
 global TOTAL_TIME, SNAPSHOTS, TIMESTEP
@@ -605,7 +603,7 @@ realprevpos = [0.0, 0.0, 0.0]
 print("Point Generated is: ",[POINT_i, POINT_j, POINT_k])
 print("Corresponds with: ", realpos)
 
-run_prev_pos = np.array([0.0, 0.0, 0.0])
+run_prev_pos = np.array([POINT_i, POINT_j, POINT_k])
 run_cur_pos = np.array([POINT_i, POINT_j, POINT_k])   # initial position
 run_cur_vel = np.array([0.0, 0.0, 0.0])               # initial position
 
@@ -638,9 +636,9 @@ print("Initial Position: ", starting_pos)
 """# Calculating Trajectory"""
 import os
 
-os.mkdir(f"c_output_data/{starting_pos}_file")
-with open(f"c_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt", "w") as run_data:
-#with open(f"critical_points.txt", "w") as run_data: #tests
+#os.mkdir(f"c_output_data/{starting_pos}_file")
+#with open(f"c_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt", "w") as run_data:
+with open(f"critical_points.txt", "w") as run_data: #tests
 
         for time in timestep:
             try:
@@ -653,7 +651,6 @@ with open(f"c_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt", 
                 unito = Bp_run/bf_mag
 
                 #auxp = rk4_int(CONST, run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], Bx, By, Bz, delta)
-                #run_cur_vel += unito*delta  
                 run_cur_pos += unito*delta # s is equally spaced now
                 
                 print(count, magnitude(run_cur_pos,run_prev_pos))
@@ -750,7 +747,7 @@ a_cr, b_cr, c_cr, d_cr, e_cr = params_cr
 # Generate some points for the fitted fourth-degree polynomial curve (for cr_den_n)
 y_cr_fitted = fourth_degree_polynomial(x_fitted, a_cr, b_cr, c_cr, d_cr, e_cr)
 
-
+print(scale_factor)
 """# Graphs"""
 
 ''' print(len(line_segment_n),len(bfield_magnitud_n))  '''
@@ -791,7 +788,7 @@ try:
   #plt.tight_layout()
 
   # Save Figure
-  plt.savefig(f"c_output_data/{starting_pos}_file/CurrentVsEnergyLogScale.png")
+  plt.savefig(f"c_output_data/{starting_pos}_file/Svs_B_MC_CR_.png")
 
   # Display the plot
   plt.show()
