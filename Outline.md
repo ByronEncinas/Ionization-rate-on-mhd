@@ -31,4 +31,4 @@ For a certain number of pockets we will have these three populations having an i
 - Identify the pockets on a specific trajectory
 - Calculate the $\mu_l,\mu_h$ that bound the pocket 
 
-Make sure there is a clause that stops integration on $s$ for $sin \alpha_i \leq \sqrt{B(s)/B(s')}$ during the column density integration, this along with a flag to trunc the ionization loop and continue with following value of $\alpha_i$
+Make sure there is a clause that stops integration on $s$ for $sin \alpha_i \leq \sqrt{B(s)/B(s')}$ during the column density integration, this along with a flag to trunc the ionization loop and continue with following value of $\alpha_i$ for a $s'$ which is the point of the particle being mirrored for that pitch angle

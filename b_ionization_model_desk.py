@@ -347,7 +347,7 @@ def ColumnDensity(sf, mu):
         trunc = False
         
         if sc == sf:  # Stop simulation at the final distance
-            return dColumnDensity , False
+            return dColumnDensity , sc
 
         if i < 1:
             ds = scoord[1] - scoord[0] # of order 10e+19
@@ -357,21 +357,18 @@ def ColumnDensity(sf, mu):
         gaspos = index[i]  # Position for s in structured grid
         gasden = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0
         Bsprime = bmag[i]
-
-         
         
         try:
             bdash = Bsprime / Bats  # Ratio of magnetic field strengths
             if (1 - mu**2) >= np.sqrt(1/bdash):
-                return dColumnDensity, True
+                return dColumnDensity, sc
             one_over = 1.0 / np.sqrt(1 - bdash * (1 - mu**2))  # Reciprocal of the square root term
             dColumnDensity += gasden * one_over * ds  # Accumulate the contribution to column density
         except ZeroDivisionError:
             if dColumnDensity is None:
                 dColumnDensity = 0.0
             print("Error: Division by zero. Check values of B(s')/B(s) and \mu")
-            
-            return dColumnDensity, False
+            return dColumnDensity, sc
         
         #print("{:<10}  {:<10}  {:<10}  {:<10} {:<10}".format(gasden,bdash,mu,ds, dColumnDensity))
 
@@ -471,16 +468,17 @@ def Ionization(sf):
     print(("Size", "Init Energy (eV)", "Energy Diff (eV)", "Pitch A. Diff", "\mu Diff"), "\n")
     print(data_size, Ei, dE, da, dmu,"\n")
 
-    for ang_i in ang[1:]: 
+    for ang_i in reversed(ang[1:]): 
 
         mui = np.cos(ang_i)
         
-        cd, trunc = ColumnDensity(sf, mui)
-        if cd == cd or trunc == True: # tests if cd = Nan
+        cd, s_trunc = ColumnDensity(sf, mui)
+
+        if cd == cd: # tests if cd = Nan
+            #print(cd == cd)
             continue
 
-        E = Ei
-
+        E             = Ei
         Current       = []
         Ji            = []
         EnergiesLog   = []
@@ -488,12 +486,12 @@ def Ionization(sf):
         Ionization    = []
         Ei_ofE        = []
         
-        print(f"Ionization (s):{dIo}", f"Column Density: {cd}") 
+        print(f"Ionization (s): {dIo}", f"Column Density: {cd}") 
 
         for k, sc in enumerate(scoord[1:]):
             #print("{:<10} {:<10} {:<10} {:<10}".format(Ei, E, k, dE))            
 
-            if sc > sf: # stop calculation at s final point
+            if sc > sf or sc > s_trunc: # stop calculation at s final point
                 break
             if k < 1:
                 ds = scoord[1] - scoord[0]
