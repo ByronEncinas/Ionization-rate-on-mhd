@@ -26,99 +26,51 @@ We follow Magnetic Field Lines (guiding centers) for charged particles.
 
 # Importing Data
 """
+if True:
+    # using .npy data
+    # this is temperature in [x,y,z]
+    temp = np.array(np.load("input_data/Temperature.npy", mmap_mode='r'))
 
-# using .npy data
-# this is temperature in [x,y,z]
-temp = np.array(np.load("input_data/Temperature.npy", mmap_mode='r'))
+    # magnetic field in [x,y,z]
+    Bx = np.array(np.load("input_data/magnetic_field_x.npy", mmap_mode='r'))
+    By = np.array(np.load("input_data/magnetic_field_y.npy", mmap_mode='r'))
+    Bz = np.array(np.load("input_data/magnetic_field_z.npy", mmap_mode='r'))
 
-# magnetic field in [x,y,z]
-Bx = np.array(np.load("input_data/magnetic_field_x.npy", mmap_mode='r'))
-By = np.array(np.load("input_data/magnetic_field_y.npy", mmap_mode='r'))
-Bz = np.array(np.load("input_data/magnetic_field_z.npy", mmap_mode='r'))
+    # Cosmic Ray Density
+    cr_den = np.array(np.load("input_data/cr_energy_density.npy", mmap_mode='r'))
 
-# Cosmic Ray Density
-cr_den = np.array(np.load("input_data/cr_energy_density.npy", mmap_mode='r'))
+    # Molecular Cloud Density
+    gas_den = np.array(np.load("input_data/gas_number_density.npy", mmap_mode='r'))
 
-# Molecular Cloud Density
-gas_den = np.array(np.load("input_data/gas_number_density.npy", mmap_mode='r'))
+    # Ion Fraction
+    ion_frac = np.array(np.load("input_data/ionization_fraction.npy", mmap_mode='r'))
 
-# Ion Fraction
-ion_frac = np.array(np.load("input_data/ionization_fraction.npy", mmap_mode='r'))
+    # Mesh Grid in Space (Unstructured)
+    x = np.array(np.load("input_data/coordinates_x.npy", mmap_mode='r'))
+    y = np.array(np.load("input_data/coordinates_y.npy", mmap_mode='r'))
+    z = np.array(np.load("input_data/coordinates_z.npy", mmap_mode='r'))
 
-# Mesh Grid in Space (Unstructured)
-x = np.array(np.load("input_data/coordinates_x.npy", mmap_mode='r'))
-y = np.array(np.load("input_data/coordinates_y.npy", mmap_mode='r'))
-z = np.array(np.load("input_data/coordinates_z.npy", mmap_mode='r'))
-
-# Velocity Dispersion
-vel_disp = np.array(np.load("input_data/velocity_dispersion.npy", mmap_mode='r'))
-
+    # Velocity Dispersion
+    vel_disp = np.array(np.load("input_data/velocity_dispersion.npy", mmap_mode='r'))
 
 def magnitude(new_vector, prev_vector=[0.0,0.0,0.0]): 
     return np.sqrt(sum([(new_vector[i]-prev_vector[i])*(new_vector[i]-prev_vector[i]) for i in range(len(new_vector))]))
 
+"""### Constants and Parameters"""
+
 """  
 Unstructured X, Y, Z Mesh Grid
-
-# X Positions
-print(x[0][0][0], x[0][0][1], x[0][1][0], x[0][1][1])
-print(x[1][0][0], x[1][0][1], x[1][1][0], x[1][1][1], '\n')
-
-# Y Positions
-print(y[0][0][0], y[0][0][1], y[0][1][0], y[0][1][1])
-print(y[1][0][0], y[1][0][1], y[1][1][0], y[1][1][1], '\n')
-
-# Z Positions
-print(z[0][0][0], z[0][0][1], z[0][1][0], z[0][1][1])
-print(z[1][0][0], z[1][0][1], z[1][1][0], z[1][1][1], '\n')
-
-# Position of vector from (0,0,0) to (0,0,1)
-relativepos = [x[0][0][1]-x[0][0][0], y[0][0][1]-y[0][0][0], z[0][0][1]-z[0][0][0]]
-print(relativepos)
-
-relativepos = [x[0][1][0]-x[0][0][0], y[0][1][0]-y[0][0][0], z[0][1][0]-z[0][0][0]]
-print(relativepos)
-
-relativepos = [x[1][0][0]-x[0][0][0], y[1][0][0]-y[0][0][0], z[1][0][0]-z[0][0][0]]
-print(relativepos)
-
-# scale factor to change from unitary cells to real space
-scale_factor = 
-
-Result:
-2.791736544372304e+19 2.7919206447928984e+19 2.791264591149962e+19 2.791302103840296e+19
-2.8206573324639883e+19 2.8208470432343945e+19 2.820246631289088e+19 2.8206338937783726e+19 
-
-2.7923448990381445e+19 2.791320227977935e+19 2.821533929948694e+19 2.820783752917449e+19
-2.7920766519432114e+19 2.791083131810591e+19 2.820975513600431e+19 2.820253222972481e+19 
-
-2.7914320208369213e+19 2.8202072708803523e+19 2.7908040214520828e+19 2.818972113194587e+19
-2.7918259321903374e+19 2.820169281646712e+19 2.7909315799961674e+19 2.819254091862435e+19 
-
-[ 1841004205944832.0,     -1.024671060209664e+16,   2.8775250043430912e+17]
-[-4719532223418368.0,      2.9189030910549606e+17, -6279993848385536.0    ]
-[ 2.8920788091684454e+17, -2682470949330944.0,      3939113534160896.0    ]
-
 """
 
 scale_factor = 0.0 
-
 relativepos = [x[0][0][1]-x[0][0][0], y[0][0][1]-y[0][0][0], z[0][0][1]-z[0][0][0]]
-print(relativepos)
 scale_factor += magnitude(relativepos)
-
 relativepos = [x[0][1][0]-x[0][0][0], y[0][1][0]-y[0][0][0], z[0][1][0]-z[0][0][0]]
-print(relativepos)
-
 scale_factor += magnitude(relativepos)
-
 relativepos = [x[1][0][0]-x[0][0][0], y[1][0][0]-y[0][0][0], z[1][0][0]-z[0][0][0]]
-print(relativepos)
 scale_factor += magnitude(relativepos)
-
 scale_factor /= 3.0 
 
-"""### Constants and Parameters"""
 
 global TOTAL_TIME, SNAPSHOTS, TIMESTEP
 
@@ -296,8 +248,6 @@ def ingrid(i,j,k, index = None):
     index = [not comp for comp in vector] # if vector = [True, False, False], index = [False, True, True] so all out of grid components are True
     return index
 
-#ingrid(0,0,0,128)
-
 """### Scalar Functions"""
 
 def find_enclosing_scalars(i, j, k):
@@ -380,8 +330,6 @@ def interpolate_scalar_field(p_i, p_j, p_k, scalar_field, epsilon=1e-10): # impl
     return interpolated_scalar
 
 """### Plotting Functions"""
-
-# Plot Trajectory of particle along field lines
 
 def plot_enclosing_dots(total_time, snaps, field_x, field_y, field_z, p_i, p_j, p_k):
 
@@ -552,9 +500,6 @@ def plot_trajectory_versus_magnitude(line_segments, B_Fields, legends, save_path
 
     plt.show()
 
-# Example usage:
-# plot_trajectory_versus_magnitude(line_segments, B_Fields, legends, save_path='plot.png')
-
 def plot_simulation_data(df):
     fig, ax = plt.subplots()
 
@@ -566,25 +511,17 @@ def plot_simulation_data(df):
     fig.tight_layout(pad = 0)
     plt.show()
 
-#plot_simulation_data(data_frame)
-
-"""# Context Plot"""
-
 if DS < 64:
   plot_3d_vec_field(Bx, By, Bz)
 
-"""# Setting Initial Conditions & Restrictions in Size"""
-
 import random
 
-ds = DS
-# Magnetic Field, Point in grid and Points that enclose it
+ds = DS # Magnetic Field, Point in grid and Points that enclose it
 margin = 3.0  # Adjust the margin as needed
 
-POINT_i = 82.0
-POINT_j = 13.9
-POINT_k = 12.8
-
+POINT_i = 121.4
+POINT_j = 109.1
+POINT_k = 13.6
 
 # Random Starting Point Y = 0
 if False:
@@ -592,7 +529,6 @@ if False:
   POINT_j = random.uniform(margin, ds-margin)
   POINT_k = random.uniform(margin, ds-margin)
 
-# 
 xpos = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, x) 
 ypos = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, y)
 zpos = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, z)

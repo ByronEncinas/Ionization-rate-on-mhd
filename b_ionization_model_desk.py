@@ -1,10 +1,10 @@
 # import for visualization
 
 import numpy as np
-from scipy.signal import find_peaks
 from scipy.integrate import quad
 import matplotlib.pyplot as plt
 import pandas as pd
+import copy
 import sys
 
 """  
@@ -311,6 +311,50 @@ Jstar = 2.4e+15*(10e+6)**(0.1)/(Enot**2.8)
 # Energy scale for cosmic rays (1 MeV = 1e+6 eV)
 Estar = 1.0e+6
 
+
+def pocket_finder():
+    from scipy.signal import find_peaks
+
+    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
+    peaks, _ = find_peaks(bmag, height=0)
+    magnetic_peaks = [bmag[p] for p in peaks]
+    _baseline = min(bmag) # global minima
+    _upline = max(magnetic_peaks) # global maxima
+    _ = magnetic_peaks.index(_upline) 
+    _indexglobalmax = peaks[_] # index of global maxima
+    
+    first_region = magnetic_peaks[:_]
+    second_region= magnetic_peaks[_+1:]
+    
+    print(peaks)
+    print(magnetic_peaks)
+    # I only care for peaks that are subsequently bigger than the last one up until the 
+
+    left_pockets = [(peaks[magnetic_peaks.index(first_region[0])], first_region[0])]  # Initialize result list with the first element of the input list
+    for i in range(1, len(first_region)):
+        if first_region[i] > first_region[i-1]:  # Compare current element with the last element in the result list
+            index = peaks[magnetic_peaks.index(first_region[i])]  # Find the corresponding index from 'peaks'
+            left_pockets.append((index, first_region[i])) # If current element is greater, add it to the result list
+    
+    right_pockets = [(peaks[magnetic_peaks.index(second_region[0])],second_region[0])]  # Initialize result list with the first element of the input list
+    for i in range(1, len(second_region)):
+        if second_region[i] < second_region[i - 1]:  # Compare current element with the previous element
+            index = peaks[magnetic_peaks.index(second_region[i])]  # Find the corresponding index from 'peaks'
+            right_pockets.append((index, second_region[i]))
+
+    print(left_pockets )
+    print(right_pockets)
+
+    plt.plot(bmag)
+    plt.plot(peaks, magnetic_peaks, "x", color="red")
+
+    plt.plot(_indexglobalmax, _upline, "x", color="black")
+
+    plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
+    plt.show()
+
+    return left_pockets, right_pockets, (_indexglobalmax, bmag[_indexglobalmax])
+
 def PowerLaw(Eparam, E, power, const):
     """
     Power-law function to model cosmic ray distribution. (Energy Losses)
@@ -341,6 +385,7 @@ def ColumnDensity(sf, mu):
     dColumnDensity = 0.0
     index_sf = scoord.index(sf)  # Find index corresponding to the final distance
     Bats = bmag[index_sf]  # Magnetic field strength at the stopping point
+    prev_sc = scoord[0]
 
     for i, sc in enumerate(scoord):
         
@@ -360,15 +405,17 @@ def ColumnDensity(sf, mu):
         
         try:
             bdash = Bsprime / Bats  # Ratio of magnetic field strengths
-            if (1 - mu**2) >= np.sqrt(1/bdash):
-                return dColumnDensity, sc
-            one_over = 1.0 / np.sqrt(1 - bdash * (1 - mu**2))  # Reciprocal of the square root term
+            deno = 1 - bdash * (1 - mu**2)
+            if deno < 0:
+                return dColumnDensity, prev_sc
+            one_over = 1.0 / np.sqrt(deno)  # Reciprocal of the square root term
             dColumnDensity += gasden * one_over * ds  # Accumulate the contribution to column density
         except ZeroDivisionError:
             if dColumnDensity is None:
                 dColumnDensity = 0.0
             print("Error: Division by zero. Check values of B(s')/B(s) and \mu")
             return dColumnDensity, sc
+        prev_sc = sc
         
         #print("{:<10}  {:<10}  {:<10}  {:<10} {:<10}".format(gasden,bdash,mu,ds, dColumnDensity))
 
@@ -392,7 +439,7 @@ def Energy(E, mu, s, ds, cd, d=0.82):
         Ei = (E**(1 + d) + (1 + d) * Lstar * cd * Estar**(d))**(1 / (1 + d))
 
     except Exception as e:
-        # Catch potential issues with Energy() function
+        # Catch forbiden values in Ei expression
         print("Error:", e)
         exit()
 
@@ -417,17 +464,6 @@ def Jcurr(Ei, E, cd):
         # Calculate Jcurr using the PowerLaw function
         Jcurr = PowerLaw(Estar, Ei, a, Jstar) * PowerLaw(Estar, Ei, -d, Lstar) / PowerLaw(Estar, E, -d, Lstar)
 
-        # Approximations:
-        # Case 1: E >> Estar => Ji(Ei) ~ J(E)
-        Jcurr_one = PowerLaw(Estar, E, a, Jstar) #* PowerLaw(Estar, Ei, d, Lstar)
-
-        # Case 2: E << Estar => Ji(Ei) ~ J(Estar)
-        E__ = 1 + (1+d) * ((Lstar * (1 + d) * Estar * cd)** (1/ 1 + d))* E**d
-        
-        Jcurr_two = PowerLaw(Estar, E__, a, Jstar) * PowerLaw(Estar, Ei, d, Lstar)
-
-        # Calculate energy using the Energy function
-        #E = Energy(Ei, mu, s, ds, d)
     except Exception as e:
         Jcurr = 0.0
         print("Error:", e)
@@ -444,51 +480,75 @@ def Jcurr(Ei, E, cd):
 - [ ] Add all three CR populations
 """
 
-def Ionization(sf):
+def Ionization(sf, reverse, mirror=False):
     # precision of simulation depends on data characteristics
-    data_size = 10e+4#len(scoord) 
+    data_size = 10e+3
+
+    import copy
+
+    lpockets, rpockets, globalmaxinfo = pocket_finder()
+    print(lpockets,rpockets)
+
+    globalmax_index = globalmaxinfo[0]
+    globalmax_field = globalmaxinfo[1]
+
+    # in the case of mirroring we'll have $\mu_i < \mu <\mu_{i+1}$ between the ith-pocket 
+    def calculate_mu(s_i, B):
+        return ((1 - B[s_i] / globalmax_field) ** 0.5)        
+
+    io_scoord = copy.copy(scoord)
+
+    if reverse: # if mirror is True this will be skipped
+        io_scoord = reversed(io_scoord[1:globalmax_index]) # backward mirrored particles
+    elif mirror == False:
+        io_scoord = io_scoord[1:globalmax_index]
+
+    # Forward moving particles (-1 < \mu < \mu_h) where \mu_h is at the lowest peak 
+    ionization_pop = 0.0
     
     # 1.60218e-6 ergs (1 MeV = 1.0e+6 eV)
     Ei = 1.0e+3 # eV
     Ef = 1.0e+9
     
     # ten thousand of precision to try
-    dE  = (Ef-Ei)/data_size
+    dE  = ( Ef - Ei ) / data_size
 
-    # 0.0 < pitch < np.pi
-    da = np.pi/data_size # 0 to np.pi/2
-    ang = [da*j  for j in range(int(data_size))]
+    # 0.0 < pitch < np.pi/2 da = np.pi/(2*data_size)
+    if mirror:
+        dmu = 1 / (2*data_size)
+        # range of \mu possible (\mu_1, \mu_2, ..., \mu_H, \mu_-1, \mu_-2, ...)
+        lmu_pockets = [(calculate_mu(io_scoord[lpockets[i]], bmag),calculate_mu(io_scoord[lpockets[i+1]], bmag)) for i in range(lpockets)] 
 
-    # 0 < mu < 1.0
-    dmu = 1.0/data_size
-    mu = [dmu*j for j in range(int(data_size))]
-    dIo = 0.0
+        pass
+    else:
+        dmu = 1 / (data_size)
+        da = np.pi / (2*data_size)
+        ang = np.array([ da *j  for j in range(int(data_size)) ])
+        mu = np.cos(ang)    
 
     print("Initial Conditions")
     print(("Size", "Init Energy (eV)", "Energy Diff (eV)", "Pitch A. Diff", "\mu Diff"), "\n")
-    print(data_size, Ei, dE, da, dmu,"\n")
+    print(data_size, Ei, dE, da, "\n")
 
-    for ang_i in reversed(ang[1:]): 
-
-        mui = np.cos(ang_i)
+    for mui in reversed(mu):   
         
         cd, s_trunc = ColumnDensity(sf, mui)
 
         if cd == cd: # tests if cd = Nan
-            #print(cd == cd)
             continue
 
-        E             = Ei
-        Current       = []
-        Ji            = []
-        EnergiesLog   = []
-        Energies      = []
-        Ionization    = []
-        Ei_ofE        = []
+        print(ionization_pop,cd, mui, (1/epsilon),J,dmu,dE)
         
-        print(f"Ionization (s): {dIo}", f"Column Density: {cd}") 
+        Evar           = Ei
+        Spectrum       = []
+        Spectrumi      = []
+        EnergiesLog    = []
+        Energies       = []
+        Ionization     = []
+        
+        print(f"Ionization (s): {ionization_pop}", f"Column Density: {cd}") 
 
-        for k, sc in enumerate(scoord[1:]):
+        for k, sc in enumerate(io_scoord): # forward
             #print("{:<10} {:<10} {:<10} {:<10}".format(Ei, E, k, dE))            
 
             if sc > sf or sc > s_trunc: # stop calculation at s final point
@@ -499,68 +559,63 @@ def Ionization(sf):
                 ds = scoord[k] - scoord[k-1]
 
             # E in 1 MeV => 1 GeV
-            E = Ei + k*dE
+            Evar = Ei + k*dE
 
             # E_exp = Ei^(1+d) = E^(1+d) + L_(1+d) N E_^d   
-            E_exp = Energy(E, mui, sc, ds, cd, d) 
+            E_exp = Energy(Evar, mui, sc, ds, cd, d) 
 
             # Current for J_+(E, mu, s)
-            J, _ = Jcurr(E_exp, E, cd)
-            J_i  = PowerLaw(Estar, E, a, Jstar)
+            J, _ = Jcurr(E_exp, Evar, cd)
+            J_i  = PowerLaw(Estar, Evar, a, Jstar)
             
             # Current using model
-            Current.append(np.log10(J))    
-            Ji.append(np.log10(J_i))    
+            Spectrum.append(np.log10(J))    
+            Spectrumi.append(np.log10(J_i))    
 
             # Log10 (E / ev)
-            EnergiesLog.append(np.log10(E))  
-            Energies.append(E)  
-
-            # E_exp
-            Ei_ofE.append(E_exp)
+            EnergiesLog.append(np.log10(Evar))  
+            Energies.append(Evar)  
             
             try:
-                #print(dIo, J, cd, ang_i, da)
-                dIo += J*dE*np.sin(ang_i)*da/epsilon
-                Ionization.append(np.log10(dIo))         
+                ionization_pop += (1/epsilon)*J*dmu*dE
+                Ionization.append(np.log10(ionization_pop))         
             except Exception as e:
                 print(e)
-                print("Jcurr() has issues")
+                print("JSpectrum() has issues")
+
+    print("Reulsting Ionization: ",ionization_pop)       
         
-        
-    return (Ionization, Current, Ji, EnergiesLog, Energies, Ei_ofE) 
+    return (Ionization, Spectrum, Ji, EnergiesLog, Energies) 
 
 # Choose a test case for the streamline coordinate
-sf = scoord[-1]  # test case
+sf       = scoord[-1]
+
+
+#ionization inputs are sf,
 
 # Test Ionization function and print the result
-ionization_result = Ionization(sf)
+# ionization_result = Ionization(sf, 0)
 
 # Calculating different Populations
 
-# Backward moving particles (-1 < \mu < \mu_h) where \mu_h is at the highest peak
-backward_ionization = 0 
+# Forward moving particles (-1 < \mu < \mu_l) where \mu_h is at the lowest peak $\mu_l = \sqrt{1-B(s)/B_l}$
+forward_ionization = Ionization(sf, reverse = False)
 
-# Forward moving particles (-1 < \mu < \mu_l) where \mu_h is at the lowest peak 
-forward_ionization = 0 
+# Backward moving particles (-1 < \mu < \mu_h) where \mu_h is at the highest peak $\mu_h = \sqrt{1-B(s)/B_h}$
+backward_ionization = Ionization(sf, reverse = True)
 
 # such that s_h and s_l form a pocket
 
-# Mirrored particles
-mirrored_ionization = 0 
+# Mirrored particles (\mu_l < \mu < \mu_h)
+# mirrored_ionization = Ionization(sf, mirror=True)
 
-
-
-
-Ionization = ionization_result[0] # Current using model
-Current    = ionization_result[1] # 
-Ji         = ionization_result[2] # 
-LogEnergies= ionization_result[3] # 
-Energies   = ionization_result[4] # 
-Ei_exp     = ionization_result[5] # 
+Ionization = forward_ionization[0] # Current using model
+Current    = forward_ionization[1] # 
+Ji         = forward_ionization[2] # 
+LogEnergies= forward_ionization[3] # 
+Energies   = forward_ionization[4] # 
 
 logscoord  = [np.log10(s) for s in scoord[1:]]
-Ei_explog  = [np.log10(ei) for ei in Ei_exp]
 
 # Create a 1x3 subplot grid
 fig, axs   = plt.subplots(3, 1, figsize=(8, 15))
@@ -586,7 +641,7 @@ axs[1].legend()
 #plt.tight_layout()
 
 # Save Figure
-plt.savefig(f"SpectrumVsEnergyLogScale.pdf")
+plt.savefig(f"SpectrumVsEnergyLogScale_ForwardIonization.pdf")
 
 # Display the plot
 plt.show()
