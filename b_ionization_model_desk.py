@@ -353,7 +353,7 @@ def pocket_finder():
     plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
     plt.show()
 
-    return left_pockets, right_pockets, (_indexglobalmax, bmag[_indexglobalmax])
+    return left_pockets + right_pockets, (_indexglobalmax, bmag[_indexglobalmax])
 
 def PowerLaw(Eparam, E, power, const):
     """
@@ -419,7 +419,7 @@ def ColumnDensity(sf, mu):
         
         #print("{:<10}  {:<10}  {:<10}  {:<10} {:<10}".format(gasden,bdash,mu,ds, dColumnDensity))
 
-def Energy(E, mu, s, ds, cd, d=0.82): 
+def Energy(E, mu, cd, d=0.82): 
     """
     Compute new energy based on the given parameters.
 
@@ -480,21 +480,21 @@ def Jcurr(Ei, E, cd):
 - [ ] Add all three CR populations
 """
 
-def Ionization(sf, reverse, mirror=False):
+def Ionization(reverse, mirror=False):
     # precision of simulation depends on data characteristics
     data_size = 10e+3
 
     import copy
 
-    lpockets, rpockets, globalmaxinfo = pocket_finder()
-    print(lpockets,rpockets)
+    pockets, globalmaxinfo = pocket_finder()
+    print(pockets)
 
     globalmax_index = globalmaxinfo[0]
     globalmax_field = globalmaxinfo[1]
 
     # in the case of mirroring we'll have $\mu_i < \mu <\mu_{i+1}$ between the ith-pocket 
-    def calculate_mu(s_i, B):
-        return ((1 - B[s_i] / globalmax_field) ** 0.5)        
+    def calculate_mu(B_i):
+        return ((1 - B_i / globalmax_field) ** 0.5)        
 
     io_scoord = copy.copy(scoord)
 
@@ -514,28 +514,43 @@ def Ionization(sf, reverse, mirror=False):
     dE  = ( Ef - Ei ) / data_size
 
     # 0.0 < pitch < np.pi/2 da = np.pi/(2*data_size)
-    if mirror:
-        dmu = 1 / (2*data_size)
-        # range of \mu possible (\mu_1, \mu_2, ..., \mu_H, \mu_-1, \mu_-2, ...)
-        lmu_pockets = [(calculate_mu(io_scoord[lpockets[i]], bmag),calculate_mu(io_scoord[lpockets[i+1]], bmag)) for i in range(lpockets)] 
+    dmu = 1 / (data_size)
 
-        pass
+    if mirror:
+        mu_pockets = []
+        a = [pockets[i][1] for i in range(len(pockets))]
+
+        for i in range(len(a) - 1):
+            if a[i] != max(a[i], a[i + 1]):
+                mu_pockets.append((a[i], a[i + 1]))
+        mu = []        
+        for group in mu_pockets: # d = (b-a)/N => N= d/(b-a)
+            start = group[0]
+            end   = group[1]
+            N = dmu / abs(end -start) 
+            for j in range(int(N)):
+                curr = start + j*dmu  
+                mu.append(curr)      
     else:
-        dmu = 1 / (data_size)
+        
         da = np.pi / (2*data_size)
-        ang = np.array([ da *j  for j in range(int(data_size)) ])
+        ang = np.array([ da * j for j in range(int(data_size)) ])
         mu = np.cos(ang)    
 
     print("Initial Conditions")
     print(("Size", "Init Energy (eV)", "Energy Diff (eV)", "Pitch A. Diff", "\mu Diff"), "\n")
     print(data_size, Ei, dE, da, "\n")
+    
+    ColumnH2       = []
 
     for mui in reversed(mu):   
         
-        cd, s_trunc = ColumnDensity(sf, mui)
+        cd, s_trunc = ColumnDensity(io_scoord[-1], mui)
 
         if cd == cd: # tests if cd = Nan
             continue
+        
+        ColumnH2.append(cd)
 
         print(ionization_pop,cd, mui, (1/epsilon),J,dmu,dE)
         
@@ -549,20 +564,17 @@ def Ionization(sf, reverse, mirror=False):
         print(f"Ionization (s): {ionization_pop}", f"Column Density: {cd}") 
 
         for k, sc in enumerate(io_scoord): # forward
+
             #print("{:<10} {:<10} {:<10} {:<10}".format(Ei, E, k, dE))            
 
-            if sc > sf or sc > s_trunc: # stop calculation at s final point
+            if sc > io_scoord[globalmax_index] or sc > s_trunc: # stop calculation at s final point
                 break
-            if k < 1:
-                ds = scoord[1] - scoord[0]
-            else:
-                ds = scoord[k] - scoord[k-1]
 
             # E in 1 MeV => 1 GeV
             Evar = Ei + k*dE
 
             # E_exp = Ei^(1+d) = E^(1+d) + L_(1+d) N E_^d   
-            E_exp = Energy(Evar, mui, sc, ds, cd, d) 
+            E_exp = Energy(Evar, mui, cd, d) 
 
             # Current for J_+(E, mu, s)
             J, _ = Jcurr(E_exp, Evar, cd)
@@ -577,19 +589,18 @@ def Ionization(sf, reverse, mirror=False):
             Energies.append(Evar)  
             
             try:
-                ionization_pop += (1/epsilon)*J*dmu*dE
-                Ionization.append(np.log10(ionization_pop))         
+                ionization_pop += (1/epsilon)*J*dmu*dE           
             except Exception as e:
                 print(e)
                 print("JSpectrum() has issues")
-
-    print("Reulsting Ionization: ",ionization_pop)       
         
-    return (Ionization, Spectrum, Ji, EnergiesLog, Energies) 
+        Ionization.append(np.log10(ionization_pop)) # Ionization for that Column Density for that population
+
+    print("Reulsting Ionization: ", ionization_pop)       
+        
+    return (Ionization, ColumnH2, EnergiesLog, Energies) 
 
 # Choose a test case for the streamline coordinate
-sf       = scoord[-1]
-
 
 #ionization inputs are sf,
 
@@ -599,10 +610,10 @@ sf       = scoord[-1]
 # Calculating different Populations
 
 # Forward moving particles (-1 < \mu < \mu_l) where \mu_h is at the lowest peak $\mu_l = \sqrt{1-B(s)/B_l}$
-forward_ionization = Ionization(sf, reverse = False)
+forward_ionization = Ionization(reverse = False)
 
 # Backward moving particles (-1 < \mu < \mu_h) where \mu_h is at the highest peak $\mu_h = \sqrt{1-B(s)/B_h}$
-backward_ionization = Ionization(sf, reverse = True)
+backward_ionization = Ionization(reverse = True)
 
 # such that s_h and s_l form a pocket
 
@@ -610,28 +621,24 @@ backward_ionization = Ionization(sf, reverse = True)
 # mirrored_ionization = Ionization(sf, mirror=True)
 
 Ionization = forward_ionization[0] # Current using model
-Current    = forward_ionization[1] # 
-Ji         = forward_ionization[2] # 
-LogEnergies= forward_ionization[3] # 
-Energies   = forward_ionization[4] # 
+ColumnH    = forward_ionization[1] # 
+LogEnergies= forward_ionization[4] # 
+Energies   = forward_ionization[5] # 
 
 logscoord  = [np.log10(s) for s in scoord[1:]]
 
 # Create a 1x3 subplot grid
-fig, axs   = plt.subplots(3, 1, figsize=(8, 15))
+fig, axs   = plt.subplots(2, 1, figsize=(8, 15))
 
 # Scatter plot for Case Zero
-axs[0].plot(LogEnergies, Current, label='$log_{10}(J(E) Energy Spectrum$', linestyle='--', color='blue')
-axs[0].plot(LogEnergies,  Ji, label='$log_{10}(J_i(E_i)) $', linestyle='--', color='red')
-axs[1].plot(LogEnergies,  Ji, label='$log_{10}(J_i(E_i)) $', linestyle='--', color='red')
-axs[2].plot(LogEnergies,  Ionization, label='$log_{10}(J_i(E_i)) $', linestyle='--', color='black')
+axs[0].plot(ColumnH, Ionization, label='$log_{10}(J(E) Energy Spectrum$', linestyle='--', color='blue')
+axs[1].plot(LogEnergies,  Ionization, label='$log_{10}(J_i(E_i)) $', linestyle='--', color='black')
 
 axs[0].set_ylabel('$log_{10}(X \ eV^-1 cm^-2 s^-1 sr^-1) )  $')
 axs[1].set_ylabel('$log_{10}(E_i(E) \ eV) ) $')
-axs[2].set_ylabel('$\zeta(s)$')
 
+axs[0].set_xlabel('$s-coordinate (cm)$')
 axs[1].set_xlabel('$E \ eV$')
-axs[2].set_xlabel('$s-coordinate (cm)$')
 
 # Add legends to each subplot
 axs[0].legend()
@@ -641,7 +648,7 @@ axs[1].legend()
 #plt.tight_layout()
 
 # Save Figure
-plt.savefig(f"SpectrumVsEnergyLogScale_ForwardIonization.pdf")
+plt.savefig(f"ForwardIonization.pdf")
 
 # Display the plot
 plt.show()
