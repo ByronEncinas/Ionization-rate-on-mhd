@@ -561,7 +561,7 @@ def Ionization(reverse, mirror=False):
         Energies       = []
         Ionization     = []
         
-        print(f"Ionization (s): {ionization_pop}", f"Column Density: {cd}") 
+        print(f"Ionization (s): ", ionization_pop, f"Column Density: ", cd) 
 
         for k, sc in enumerate(io_scoord): # forward
 
@@ -596,7 +596,7 @@ def Ionization(reverse, mirror=False):
         
         Ionization.append(np.log10(ionization_pop)) # Ionization for that Column Density for that population
 
-    print("Reulsting Ionization: ", ionization_pop)       
+    print("Resulting Ionization: ", ionization_pop)       
         
     return (Ionization, ColumnH2, EnergiesLog, Energies) 
 
