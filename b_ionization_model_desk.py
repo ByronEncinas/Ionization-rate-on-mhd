@@ -561,7 +561,7 @@ def Ionization(reverse, mirror=False):
         Energies       = []
         Ionization     = []
         
-        print(f"Ionization (s): ", ionization_pop, f"Column Density: ", cd) 
+        print("Ionization (s): ", ionization_pop, "Column Density: ", cd) 
 
         for k, sc in enumerate(io_scoord): # forward
 
