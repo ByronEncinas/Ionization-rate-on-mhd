@@ -3,6 +3,7 @@ __py*
 a_output*
 b_output*
 input_data
+venv
 .vscode
 
 # png
