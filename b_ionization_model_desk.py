@@ -648,7 +648,7 @@ axs[1].legend()
 #plt.tight_layout()
 
 # Save Figure
-plt.savefig(f"ForwardIonization.pdf")
+plt.savefig("IonizationVSColumnDensity.pdf")
 
 # Display the plot
 plt.show()
