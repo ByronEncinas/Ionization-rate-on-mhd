@@ -291,7 +291,7 @@ for iter in data_list: # Data into variables
 # Threshold parameters for the power-law distribution
 global d, a, Lstar, Jstar, Estar, epsilon
 
-# mean energy ε lost by a CR particle per ionization event
+# mean energy epsilon lost by a CR particle per ionization event
 epsilon = 0.028837732137317718 #eV
 
 # Fraction of energy deposited locally (1 - d)
