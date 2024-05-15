@@ -1,5 +1,5 @@
 from z_library import *
-import bisect
+import json
 
 """  
 Using Margo Data
@@ -70,7 +70,7 @@ TIMESTEP   = 0.05
 SNAPSHOTS  = int(TOTAL_TIME/TIMESTEP)
 CONST      = 1.0e+3
 DS         = 128
-MARGIN     = 3.0
+MARGIN     = 34
 
 print()
 print("Timestep Delta: ", TIMESTEP)
@@ -119,58 +119,66 @@ while cycle < max_cycles:
 
     # random point has been selected, now we gotta follow field lines
 
-    
-    prev_pos = np.array([point_i, point_j, point_k])
-    forward_cur_pos = np.array([point_i, point_j, point_k])   # initial position
+    def trajectory(point_i, point_j, point_k, direction):    
 
-    timestep = np.linspace(0, TOTAL_TIME, SNAPSHOTS + 1)  # start time, final_time, number of snapshots
-    delta = timestep[1] - timestep[0]                     # delta timestep
+        prev_pos = np.array([point_i, point_j, point_k])
+        forward_cur_pos = np.array([point_i, point_j, point_k])   # initial position
 
-    radius_vector = [forward_cur_pos.tolist()]                      # all trajectory points
+        timestep = np.linspace(0, TOTAL_TIME, SNAPSHOTS + 1)  # start time, final_time, number of snapshots
+        delta = timestep[1] - timestep[0]                     # delta timestep
 
-    bfield_s = [interpolate_vector_field( forward_cur_pos[0],  forward_cur_pos[1],  forward_cur_pos[2], Bx, By, Bz)]  # all trajectory points
+        if direction == -1:
+            delta *= -1
 
-    lin_seg = 0.0                                         #distance of path traveled (s)
-    bf_mag =  0.0                                         # magnetic field at s-distance
+        radius_vector = [forward_cur_pos.tolist()]                      # all trajectory points
 
-    distance = []                                # acumulative pathdistances
-    bfield = []                             # magnetic field at each s-distance
+        bfield_s = [interpolate_vector_field( forward_cur_pos[0],  forward_cur_pos[1],  forward_cur_pos[2], Bx, By, Bz)]  # all trajectory points
 
-    count = 0                                             # iterator count
-    max_bp = 0.0                                     # maximum magnetic field experienced
-    min_bp = 0.0                                     # minimum magnetic field experienced
+        lin_seg = 0.0                                         #distance of path traveled (s)
+        bf_mag =  0.0                                         # magnetic field at s-distance
 
-    """# Calculating Trajectory"""
-    # We are looking into the two nearest critical points, so let's look at points were first derivative 
+        distance = []                                # acumulative pathdistances
+        bfield = []                             # magnetic field at each s-distance
 
-    for time in timestep:
-        try:
-                # print(count, lin_seg ,bf_mag)
-                # B Field at current position and save
-                Bp_run = np.array(interpolate_vector_field(forward_cur_pos[0], 
-                                    forward_cur_pos[1],  forward_cur_pos[2], Bx, By, Bz))
-                bfield_s.append(Bp_run)
-                bf_mag = magnitude(Bp_run)
+        count = 0                                             # iterator count
 
-                # unit vector in field direction
-                unito = Bp_run/bf_mag
-                forward_cur_pos += unito*delta
-                    
-                radius_vector.append(forward_cur_pos.tolist())
-                    
-        except:
-            print("Particle got out of the Grid")
-            break
+        """# Calculating Trajectory"""
+        # We are looking into the two nearest critical points, so let's look at points were first derivative 
+        for time in timestep:
+            try:
+                    # print(count, lin_seg ,bf_mag)
+                    # B Field at current position and save
+                    Bp_run = np.array(interpolate_vector_field(forward_cur_pos[0], 
+                                        forward_cur_pos[1],  forward_cur_pos[2], Bx, By, Bz))
+                    bfield_s.append(Bp_run)
+                    bf_mag = magnitude(Bp_run)
 
-        lin_seg +=  magnitude(forward_cur_pos,  prev_pos) * scale_factor # centimeters
-        prev_pos =  forward_cur_pos.copy()
+                    # unit vector in field direction
+                    unito = Bp_run/bf_mag
+                    forward_cur_pos += unito*delta
+                        
+                    radius_vector.append(forward_cur_pos.tolist())
+                        
+            except:
+                print("Particle got out of the Grid")
+                break
 
-        distance.append(lin_seg)
-        bfield.append(bf_mag)
+            lin_seg +=  magnitude(forward_cur_pos,  prev_pos) * scale_factor # centimeters
+            prev_pos =  forward_cur_pos.copy()
 
-        count += 1
+            distance.append(lin_seg)
+            bfield.append(bf_mag)
 
+            count += 1
+        
+        return (radius_vector, bfield)
 
+    left_radius_vector, left_bfield_magnitudes = trajectory(point_i, point_j, point_k, -1)
+    right_radius_vector, right_bfield_magnitudes = trajectory(point_i, point_j, point_k, 1)
+
+     # this [1:] cut is because both lists contain the initial point
+    radius_vector = list(reversed(left_radius_vector)) + right_radius_vector[1:]
+    bfield        = list(reversed(left_bfield_magnitudes)) + right_bfield_magnitudes[1:]
 
     #print()
     #print(f"Initial Position: {forward_cur_pos}, Timestep: {delta}\n")
@@ -208,6 +216,7 @@ while cycle < max_cycles:
     B_r = bfield[p_r]
 
     print("random index: ", p_r, "peak's index: ", index_pocket)
+    
 
     """How to find index of Bl?"""
 
@@ -253,6 +262,16 @@ while cycle < max_cycles:
     bl: magnetic at position s of the trajectory
     """
     
+import json
+
+# Specify the file path
+file_path = 'prev_meeting_random_distributed_reduction_factor.json'
+
+# Write the list data to a JSON file
+with open(file_path, 'w') as json_file:
+    json.dump(red_factor, json_file)
+
+
 print(red_factor)
 """# Graphs"""
 
@@ -263,6 +282,13 @@ print("Plot B(s)")
 
 # Here we plot the histogram for given reduction factor
 import matplotlib.pyplot as plt
+
+if len(sys.argv) >= 2:
+    bins = int(sys.argv[2])
+    print("bins:", bins)
+else:
+    bins = 100
+    print("bins:", bins)
 
 bins = 100
 # Plotting the histogram

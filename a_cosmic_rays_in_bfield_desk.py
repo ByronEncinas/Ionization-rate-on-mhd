@@ -614,9 +614,7 @@ with open(f"a_output_data/critical_points.txt", "w") as run_data: #tests
                 run_data.write(f"{count}, {lin_seg}, {xpos}, {ypos}, {zpos},{bf_mag},{Bp_run[0]},{Bp_run[1]},{Bp_run[2]},{run_cur_pos[0]},{run_cur_pos[1]},{run_cur_pos[2]}\n") 
 
             except:
-
                 print("Particle got out of the Grid")
-
                 break
 
             lin_seg +=  magnitude(run_cur_pos, run_prev_pos)*scale_factor # centimeters
