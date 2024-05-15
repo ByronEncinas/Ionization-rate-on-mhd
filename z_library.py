@@ -1,108 +1,13 @@
-# import for visualization
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.optimize import curve_fit
+import numpy as np
+from mpl_toolkits.mplot3d import Axes3D
 
-"""# Objective
-
-**This code is intended to solve for the trajectory of a particle following magnetic field lines.**
-
-The procedure is as follows:
-
-1. Setting up initial conditions
-
-We set up the initial position inside the grid for the particle.
-
-<code>
-pi, pj, pk = initialx, initialy, initialz
-</code>
-
-2. Finding the 8 Magnetic field vectors that enclose the initial position
-
-We use the function <code>interpolate_vector_field(pi, pj, pk)</code> &  <code>find_enclosing_vectors(grid, i, j, k)</code> to facilitate the interpolation in unknown points inside of the grid.
-
-We follow Magnetic Field Lines (guiding centers) for charged particles.
-
-# Importing Data
-"""
-if True:
-    # using .npy data
-    # this is temperature in [x,y,z]
-    temp = np.array(np.load("input_data/Temperature.npy", mmap_mode='r'))
-
-    # magnetic field in [x,y,z]
-    Bx = np.array(np.load("input_data/magnetic_field_x.npy", mmap_mode='r'))
-    By = np.array(np.load("input_data/magnetic_field_y.npy", mmap_mode='r'))
-    Bz = np.array(np.load("input_data/magnetic_field_z.npy", mmap_mode='r'))
-
-    # Cosmic Ray Density
-    cr_den = np.array(np.load("input_data/cr_energy_density.npy", mmap_mode='r'))
-
-    # Molecular Cloud Density
-    gas_den = np.array(np.load("input_data/gas_number_density.npy", mmap_mode='r'))
-
-    # Ion Fraction
-    ion_frac = np.array(np.load("input_data/ionization_fraction.npy", mmap_mode='r'))
-
-    # Mesh Grid in Space (Unstructured)
-    x = np.array(np.load("input_data/coordinates_x.npy", mmap_mode='r'))
-    y = np.array(np.load("input_data/coordinates_y.npy", mmap_mode='r'))
-    z = np.array(np.load("input_data/coordinates_z.npy", mmap_mode='r'))
-
-    # Velocity Dispersion
-    vel_disp = np.array(np.load("input_data/velocity_dispersion.npy", mmap_mode='r'))
 
 def magnitude(new_vector, prev_vector=[0.0,0.0,0.0]): 
     return np.sqrt(sum([(new_vector[i]-prev_vector[i])*(new_vector[i]-prev_vector[i]) for i in range(len(new_vector))]))
-
-"""### Constants and Parameters"""
-
-"""  
-Unstructured X, Y, Z Mesh Grid
-"""
-
-scale_factor = 0.0 
-relativepos = [x[0][0][1]-x[0][0][0], y[0][0][1]-y[0][0][0], z[0][0][1]-z[0][0][0]]
-scale_factor += magnitude(relativepos)
-relativepos = [x[0][1][0]-x[0][0][0], y[0][1][0]-y[0][0][0], z[0][1][0]-z[0][0][0]]
-scale_factor += magnitude(relativepos)
-relativepos = [x[1][0][0]-x[0][0][0], y[1][0][0]-y[0][0][0], z[1][0][0]-z[0][0][0]]
-scale_factor += magnitude(relativepos)
-scale_factor /= 3.0 
-
-
-global TOTAL_TIME, SNAPSHOTS, TIMESTEP
-
-# CONSTANT
-POINT_i, POINT_j, POINT_k = int(), int(), int()
-TOTAL_TIME = 9_000_000
-TIMESTEP   = 0.05
-SNAPSHOTS  = int(TOTAL_TIME/TIMESTEP)
-CONST      = 1.0e+3
-DS         = 128
-MARGIN     = 3.0
-
-print("Timestep Delta: ", TIMESTEP)
-print("Total Time    : ", TOTAL_TIME)
-print("Snapshots     : ", SNAPSHOTS)
-
-# We cut the size of data for faster processing
-Bx = Bx[0:DS, 0:DS, 0:DS]
-By = By[0:DS, 0:DS, 0:DS]
-Bz = Bz[0:DS, 0:DS, 0:DS]
-x =   x[0:DS, 0:DS, 0:DS]
-y =   y[0:DS, 0:DS, 0:DS]
-z =   z[0:DS, 0:DS, 0:DS]
-
-print(f"\nSize of array matrix: {Bx.shape[0]}x{By.shape[0]}x{Bz.shape[0]}\n")
-
-"""# Methods
-
-##Simulation Functions
-
-### Numerical Integration
-"""
 
 def Ind(i):
   '''
@@ -168,6 +73,167 @@ def run_second_order(const, position, velocity, Bx, By, Bz, timestep):
 
     return new_position, new_velocity
 
+def pocket_finder(bmag): # deprecated
+    from scipy.signal import find_peaks
+
+    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
+    all_peaks, _ = find_peaks(bmag, height=0)
+    all_magnetic_peaks = [bmag[p] for p in all_peaks]
+    print(all_magnetic_peaks)
+    _baseline = min(bmag) # global minima
+    _upline = max(all_magnetic_peaks) # global maxima
+    _ = all_magnetic_peaks.index(_upline) 
+    _indexglobalmax =all_peaks[_] # index of global maxima
+    
+    first_region = all_magnetic_peaks[:_]
+    second_region= all_magnetic_peaks[_+1:]
+    
+    #print(peaks)
+    #print(magnetic_peaks)
+    # I only care forall_peaks that are subsequently bigger than the last one up until the 
+
+    left_pockets = [(all_peaks[all_magnetic_peaks.index(first_region[0])], first_region[0])]  # Initialize result list with the first element of the input list
+    for i in range(1, len(first_region)):
+        if first_region[i] > first_region[i-1]:  # Compare current element with the last element in the result list
+            index =all_peaks[all_magnetic_peaks.index(first_region[i])]  # Find the corresponding index from 'peaks'
+            left_pockets.append((index, first_region[i])) # If current element is greater, add it to the result list
+    
+    right_pockets = [(all_peaks[all_magnetic_peaks.index(second_region[0])],second_region[0])]  # Initialize result list with the first element of the input list
+    for i in range(1, len(second_region)):
+        if second_region[i] < second_region[i - 1]:  # Compare current element with the previous element
+            index =all_peaks[all_magnetic_peaks.index(second_region[i])]  # Find the corresponding index from 'peaks'
+            right_pockets.append((index, second_region[i]))
+
+    left_index = [lp[0] for lp in left_pockets]
+    right_index = [rp[0] for rp in right_pockets]
+
+    indexes = [lp[0] for lp in left_pockets] + [rp[0] for rp in right_pockets]
+    bfield_at_index = [lp[1] for lp in left_pockets] + [rp[1] for rp in right_pockets]
+
+    print(left_index)
+    print(right_index)
+
+    plt.plot(bmag)
+    
+    plt.plot(indexes, bfield_at_index , "+", color="red")
+    plt.plot(all_peaks, all_magnetic_peaks, "x", color="green")
+
+    plt.plot(_indexglobalmax, _upline, "x", color="black")
+
+    plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
+    plt.show()
+    
+    plt.plot(all_peaks, all_magnetic_peaks, "--", color="green")
+
+    plt.plot(_indexglobalmax, _upline, "x", color="black")
+
+    plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
+    plt.show()
+
+    print("Pocket Regions Obtained")
+
+    return left_pockets + right_pockets, (_indexglobalmax, bmag[_indexglobalmax])
+
+def visualize_pockets(bmag, cycle, plot=False):
+    import matplotlib.pyplot as plt
+    from scipy.signal import find_peaks
+    import copy
+
+    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
+    all_peaks, _ = find_peaks(bmag, height=0)
+    all_magnetic_peaks = [bmag[p] for p in all_peaks]
+    magnetic_peaks = all_magnetic_peaks.copy()
+
+    if magnetic_peaks:
+        index_global_max = all_peaks[np.argmax(magnetic_peaks)]
+    else:
+        # Handle the case when magnetic_peaks is empty
+        print("magnetic_peaks is empty, cannot compute argmax")
+        return (all_peaks, all_magnetic_peaks), (None, None)
+
+    index_global_max = all_peaks[np.argmax(magnetic_peaks)]
+    
+    # index_global_max = all_peaks[np.argmax(magnetic_peaks)] => magnetic_peaks can be an empty list 
+    # ValueError: attempt to get argmax of an empty sequence
+
+    baseline = min(bmag)
+    upline = max(magnetic_peaks)
+
+    # filter all
+    def filter_values(lst):
+        i = 1
+        while i < len(lst) - 1:
+            if lst[i] < lst[i - 1] or lst[i] < lst[i + 1]:
+                del lst[i]
+            else:
+                i += 1
+        return lst
+
+    # we want to comply with
+
+    # Example usage:
+    max_index = all_magnetic_peaks.index(max(all_magnetic_peaks))
+
+    first  = all_magnetic_peaks[:max_index+1].copy()
+    second = list(reversed(all_magnetic_peaks[max_index:].copy()))
+
+    first_filtered_list = filter_values(first)
+    second_filtered_list = filter_values(second)
+
+    complete_list = first_filtered_list[0:-1] + [bmag[index_global_max]] + list(reversed(second_filtered_list[0:-1]))
+    x = [all_magnetic_peaks.index(f) for f in complete_list]
+    y = [all_peaks[i] for i in x]
+
+    if plot:
+        # Create a figure and axes for the subplot layout
+        fig, axs = plt.subplots(3, 1, figsize=(8, 6))
+
+        # Plot the first set of data on the first subplot
+        axs[0].plot(bmag)
+        axs[0].plot(all_peaks, all_magnetic_peaks, "x", color="green")
+        axs[0].plot(index_global_max, upline, "x", color="black")
+        axs[0].plot(np.ones_like(bmag)*baseline, "--", color="gray")
+        axs[0].set_xlabel("Index")
+        axs[0].set_ylabel("Field")
+        axs[0].set_title("Actual Field Shape")
+        axs[0].legend(["bmag", "all peaks", "index_global_max", "baseline"])
+        axs[0].grid(True)
+
+        # Plot the second set of data on the second subplot
+        axs[1].plot(all_magnetic_peaks, marker='+',color='red')
+        axs[1].plot(x, complete_list, marker='x', color='grey')
+        axs[1].set_xlabel("Index")
+        axs[1].set_ylabel("Field")
+        axs[1].set_title("Reduced Set (red) & Pockets (grey)")
+        axs[1].legend(["Reduced Field", "Pockets"])
+        axs[1].grid(True)
+
+        # field shape into 
+        axs[2].plot(all_peaks,all_magnetic_peaks, marker='+', color='red')
+        axs[2].plot(y, complete_list, marker='x', color='grey')
+        axs[2].set_xlabel("Index")
+        axs[2].set_ylabel("Field")
+        axs[2].set_title("Reduced Set (red) & Pockets (grey)")
+        axs[2].legend(["Reduced Field", "Pockets"])
+        axs[2].grid(True)
+
+        # Adjust layout to prevent overlap
+        plt.tight_layout()
+
+        # Save the figure
+        plt.savefig(f"c_output_data/c_output_field_shape{cycle}.png")
+
+        # Show the plot
+        plt.show()
+
+    return (y, complete_list), (index_global_max, bmag[index_global_max])
+
+def find_insertion_point(index_pocket, p_r):
+    for i in range(len(index_pocket)):
+        if p_r < index_pocket[i]:
+            return i  # Insert before index i
+    return len(index_pocket)  # Insert at the end if p_r is greater than or equal to all elements
+
 """### Vector Functions"""
 
 def find_enclosing_vectors(i, j, k):
@@ -218,7 +284,7 @@ def interpolate_vector_field(point_i, point_j, point_k, field_x, field_y, field_
         else:
             # Handle the case where indices are out of bounds (you may choose to do something specific here)
             pass
-            print(f"Indices out of bounds: {i}, {j}, {k}")
+            #print(f"Indices out of bounds: {i}, {j}, {k}")
 
     interpolated_vector =  (1 - u) * (1 - v) * (1 - w) * vectors[0] + \
          (1 - u) * w * (1 - v) * vectors[1] + \
@@ -511,229 +577,4 @@ def plot_simulation_data(df):
     ax.table(cellText=df.values, colLabels=df.columns, loc='center')
     fig.tight_layout(pad = 0)
     plt.show()
-
-if DS < 64:
-  plot_3d_vec_field(Bx, By, Bz)
-
-import random
-
-ds = DS # Magnetic Field, Point in grid and Points that enclose it
-margin = 3.0  # Adjust the margin as needed
-
-POINT_i = 121.4
-POINT_j = 109.1
-POINT_k = 13.6
-
-# Random Starting Point Y = 0
-if False:
-  POINT_i = random.uniform(margin, ds-margin)
-  POINT_j = random.uniform(margin, ds-margin)
-  POINT_k = random.uniform(margin, ds-margin)
-
-xpos = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, x) 
-ypos = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, y)
-zpos = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, z)
-
-realpos = [xpos,ypos,zpos]
-realprevpos = [0.0, 0.0, 0.0]
-
-print("Point Generated is: ",[POINT_i, POINT_j, POINT_k])
-print("Corresponds with: ", realpos)
-
-run_prev_pos = np.array([POINT_i, POINT_j, POINT_k])
-run_cur_pos = np.array([POINT_i, POINT_j, POINT_k])   # initial position
-run_cur_vel = np.array([0.0, 0.0, 0.0])               # initial position
-
-timestep = np.linspace(0, TOTAL_TIME, SNAPSHOTS + 1)  # start time, final_time, number of snapshots
-delta = timestep[1] - timestep[0]                     # delta timestep
-
-follown = [run_cur_pos.tolist()]                      # all trajectory points
-
-Bpsn = [interpolate_vector_field(run_cur_pos[0], run_cur_pos[1], run_cur_pos[2], Bx, By, Bz)]  # all trajectory points
-
-lin_seg = 0.0                                         # distance of path traveled (s)
-bf_mag =  0.0                                         # magnetic field at s-distance
-
-line_segment_n = []                                # acumulative path distances
-bfield_magnitud_n = []                             # magnetic field at each s-distance
-
-cr_density = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, cr_den)
-mc_density = interpolate_scalar_field(POINT_i, POINT_j, POINT_k, gas_den)
-
-cr_den_n = [cr_density]
-mc_den_n = [mc_density]
-
-count = 0                                             # iterator count
-max_diff_bp = 0.0                                     # maximum magnetic field experienced
-min_diff_bp = 0.0                                     # minimum magnetic field experienced
-
-starting_pos = '['+str(round(run_cur_pos[0],1)) +',' + str(round(run_cur_pos[1],1))+',' + str(round(run_cur_pos[2],1))+']'
-print("Initial Position: ", starting_pos)
-
-"""# Calculating Trajectory"""
-import os
-
-#os.mkdir(f"b_output_data/{starting_pos}_file")
-#with open(f"b_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt", "w") as run_data:
-with open(f"a_output_data/critical_points.txt", "w") as run_data: #tests
-
-        for time in timestep:
-            try:
-                # B Field at current position and save
-                Bp_run = np.array(interpolate_vector_field(run_cur_pos[0], run_cur_pos[1], run_cur_pos[2], Bx, By, Bz))
-                Bpsn.append(Bp_run)
-                bf_mag = magnitude(Bp_run)
-
-                # unit vector in field direction
-                unito = Bp_run/bf_mag
-
-                #auxp = rk4_int(CONST, run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], Bx, By, Bz, delta)
-                run_cur_pos += unito*delta # s is equally spaced now
-                
-                print(count, magnitude(run_cur_pos,run_prev_pos))
-                follown.append(run_cur_pos.tolist())
-
-                xpos = interpolate_scalar_field(run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], x) 
-                ypos = interpolate_scalar_field(run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], y)
-                zpos = interpolate_scalar_field(run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], z)
-
-                realpos = [xpos,ypos,zpos]
-                
-                #follown.append(realpos)
-                follown.append(run_cur_pos.tolist())
-
-                cr_density = interpolate_scalar_field(run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], cr_den)
-                mc_density = interpolate_scalar_field(run_cur_pos[0],run_cur_pos[1],run_cur_pos[2], gas_den)
-
-                cr_avg = (cr_density + cr_den_n[-1]) / 2.0
-                mc_avg = (mc_density + mc_den_n[-1]) / 2.0
-
-                cr_den_n.append(cr_avg)
-                mc_den_n.append(mc_avg)
-                
-                run_data.write(f"{count}, {lin_seg}, {xpos}, {ypos}, {zpos},{bf_mag},{Bp_run[0]},{Bp_run[1]},{Bp_run[2]},{run_cur_pos[0]},{run_cur_pos[1]},{run_cur_pos[2]}\n") 
-
-            except:
-
-                print("Particle got out of the Grid")
-
-                break
-
-            lin_seg +=  magnitude(run_cur_pos, run_prev_pos)*scale_factor # centimeters
-            run_prev_pos = run_cur_pos.copy()
-
-            
-            line_segment_n.append(lin_seg)
-            bfield_magnitud_n.append(bf_mag)
-
-            count += 1
-
-bmag = bfield_magnitud_n.copy()
-
-try:
-  max_diff_bp = max(bmag)
-  min_diff_bp = min(bmag)
-except:
-  exit()
-
-print(f"Initial Position: {starting_pos}, Timestep: {delta}\n")
-print("Initial Position Vector --> Final Position Vector")
-print("RunggeKutta4: ",follown[0], "-->", run_cur_pos)
-
-print("Min, Max of B in trayectory: ", min_diff_bp, max_diff_bp)
-
-simulation_data = {
-   "Starting Position": tuple(follown[0]),
-   "Final Position": tuple(run_cur_pos),
-   "Timestep (Delta t)": delta,
-   "Method": "Runge Kutta 4, Second Order",
-   "B Field Min, Max": (min_diff_bp, max_diff_bp),
-   "Grid Size": f"{DS}x{DS}x{DS}"
-}
-
-"""# Scipy Interpolation for MC and CR data"""
-
-from scipy.optimize import curve_fit
-import numpy as np
-
-# Your data
-x = line_segment_n.copy()
-y_mc = mc_den_n[1:].copy()
-y_cr = cr_den_n[1:].copy()
-
-# Define a fourth-degree polynomial function
-def fourth_degree_polynomial(x, a, b, c, d, e):
-    return a * x**4 + b * x**3 + c * x**2 + d * x + e
-
-# Use curve_fit to fit the fourth-degree polynomial model to the data (for mc_den_n)
-params_mc, covariance_mc = curve_fit(fourth_degree_polynomial, x, y_mc)
-
-# Extract the parameters for mc_den_n
-a_mc, b_mc, c_mc, d_mc, e_mc = params_mc
-
-# Generate some points for the fitted fourth-degree polynomial curve (for mc_den_n)
-x_fitted = np.linspace(min(x), max(x), len(x))
-y_mc_fitted = fourth_degree_polynomial(x_fitted, a_mc, b_mc, c_mc, d_mc, e_mc)
-
-# Use curve_fit to fit the fourth-degree polynomial model to the data (for cr_den_n)
-params_cr, covariance_cr = curve_fit(fourth_degree_polynomial, x, y_cr)
-
-# Extract the parameters for cr_den_n
-a_cr, b_cr, c_cr, d_cr, e_cr = params_cr
-
-# Generate some points for the fitted fourth-degree polynomial curve (for cr_den_n)
-y_cr_fitted = fourth_degree_polynomial(x_fitted, a_cr, b_cr, c_cr, d_cr, e_cr)
-
-print(scale_factor)
-"""# Graphs"""
-
-''' print(len(line_segment_n),len(bfield_magnitud_n))  '''
-
-try:
-  plot_trajectory_versus_magnitude(line_segment_n,bfield_magnitud_n, ["B Field Density in Path", "B-Magnitude", "s-coordinate"])
-  plot_trajectory_versus_magnitude(line_segment_n,mc_den_n[1:], ["Molecular Cloud Density in Path", "MC Density", "s-coordinate"])
-  plot_trajectory_versus_magnitude(line_segment_n,cr_den_n[1:], ["Cosmic Ray Density in Path", "CR Density", "s-coordinate"])
-  
-  # Create a 1x3 subplot grid
-  fig, axs = plt.subplots(3, 1, figsize=(10, 15))
-
-  # Scatter plot for Case Zero
-  axs[0].scatter(line_segment_n,bfield_magnitud_n, label='$B(s)$', marker='x', color='blue')
-  
-  axs[1].scatter(line_segment_n,mc_den_n[1:], label='$Cloud$', marker='+', color='green')
-  axs[1].plot(x_fitted,y_mc_fitted, label='$Cloud$', linestyle='--', color='black')
-
-  axs[2].scatter(line_segment_n,cr_den_n[1:], label='$CRs$', marker='*', color='red')
-  axs[2].plot(x_fitted, y_cr_fitted, label='$CRs$', linestyle='--', color='black')
-
-
-  axs[0].set_xlabel('$Log_{10}(E \ eV)$')
-  axs[0].set_ylabel('$Log_{10}(J eV^{-1} cm^{-2} s^{-1} sr^{-1})$')
-
-  axs[1].set_xlabel('$distance (cm)$')
-  axs[1].set_ylabel('$MC Density gr/cm^3$')
-
-  axs[2].set_xlabel('$distance (cm)$')
-  axs[2].set_ylabel('$CR Density gr/cm^3$')
-
-  # Add legends to each subplot
-  axs[0].legend()
-  axs[1].legend()
-  axs[2].legend()
-
-  # Adjust layout for better spacing
-  #plt.tight_layout()
-
-  # Save Figure
-  plt.savefig(f"b_output_data/{starting_pos}_file/Svs_B_MC_CR_.png")
-
-  # Display the plot
-  plt.show()
-
-
-except Exception as e:
-  print(e)
-  print("Not Possible to plot")
-
-print(f"b_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt")
 

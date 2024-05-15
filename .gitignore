@@ -2,6 +2,7 @@
 __py*
 a_output*
 b_output*
+c_output*
 input_data
 venv
 .vscode
@@ -15,3 +16,4 @@ venv
 runner.py
 setup.py
 spectrum.py
+test.py
