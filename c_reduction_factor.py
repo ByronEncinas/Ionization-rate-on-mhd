@@ -298,7 +298,7 @@ fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
 # Plot histograms on the respective axes
 axs[0].hist(reduction_factor, bins=bins, color='skyblue', edgecolor='black')
-axs[1].hist(normalized_reduction_factor, bins=bins, color='skyblue', edgecolor='black')
+axs[1].hist(normalized_reduction_factor, density=True, bins=bins, color='skyblue', edgecolor='black')
 
 # Adding labels and title for each subplot
 axs[0].set_title('Histogram of Reduction Factor')
