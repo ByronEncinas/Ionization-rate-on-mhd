@@ -290,15 +290,30 @@ else:
     bins = 100
     print("bins:", bins)
 
-# 'density=True' makes the total area of the plot to be equal to 1
-plt.hist(reduction_factor, density=True, bins=bins, color='skyblue', edgecolor='black')
+hstscale = max(reduction_factor)
+normalized_reduction_factor = [reduction_factor[i]/hstscale for i in range(len(reduction_factor))]
 
-# Adding labels and title
-plt.xlabel('Bins')
-plt.ylabel('Reduction Factor (R)')
-plt.title('Reduction Factor across randomized selection of points in MC')
+# Create a figure and axes objects
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
+# Plot histograms on the respective axes
+axs[0].hist(reduction_factor, bins=bins, color='skyblue', edgecolor='black')
+axs[1].hist(normalized_reduction_factor, bins=bins, color='skyblue', edgecolor='black')
+
+# Adding labels and title for each subplot
+axs[0].set_title('Histogram of Reduction Factor')
+axs[0].set_xlabel('Bins')
+axs[0].set_ylabel('Frequency')
+
+axs[1].set_title('Normalized Histogram of Reduction Factor')
+axs[1].set_xlabel('Bins')
+axs[1].set_ylabel('Frequency')
+
+# Adjust layout
+plt.tight_layout()
+
+# Save the figure
 plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}.png")
 
-# Displaying the histogram
-#plt.show()
+# Show the plot
+plt.show()
