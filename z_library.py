@@ -180,10 +180,7 @@ def visualize_pockets(bmag, cycle, plot=False):
     first_filtered_list = filter_values(first)
     second_filtered_list = filter_values(second)
 
-    if first_filtered_list[1] > first_filtered_list[0]:
-        first_filtered_list = first_filtered_list.copy()[1:]
-    if second_filtered_list[1] == second_filtered_list[0]:
-        second_filtered_list = second_filtered_list.copy()[1:]
+
 
 
     complete_list = first_filtered_list[0:-1] + [bmag[index_global_max]] + list(reversed(second_filtered_list[0:-1]))

@@ -88,7 +88,7 @@ z =   z[0:DS, 0:DS, 0:DS]
 print()
 print("Size of array matrix: {Bx.shape[0]}x{By.shape[0]}x{Bz.shape[0]}\n")
 
-red_factor = []
+reduction_factor = []
 
 import random
 
@@ -245,7 +245,7 @@ while cycle < max_cycles:
 
     if B_r/B_l < 1:
         R = 1 - np.sqrt(1-B_r/B_l)
-        red_factor.append(R)
+        reduction_factor.append(R)
         cycle += 1
     else:
         continue
@@ -269,10 +269,10 @@ file_path = 'prev_meeting_random_distributed_reduction_factor.json'
 
 # Write the list data to a JSON file
 with open(file_path, 'w') as json_file:
-    json.dump(red_factor, json_file)
+    json.dump(reduction_factor, json_file)
 
 
-print(red_factor)
+print(reduction_factor)
 """# Graphs"""
 
 # shape of field lines 
@@ -290,16 +290,15 @@ else:
     bins = 100
     print("bins:", bins)
 
-bins = 100
-# Plotting the histogram
-plt.hist(red_factor, bins=bins, color='skyblue', edgecolor='black')
+# 'density=True' makes the total area of the plot to be equal to 1
+plt.hist(reduction_factor, density=True, bins=bins, color='skyblue', edgecolor='black')
 
 # Adding labels and title
-plt.xlabel(f'bins (bins)')
+plt.xlabel('Bins')
 plt.ylabel('Reduction Factor (R)')
 plt.title('Reduction Factor across randomized selection of points in MC')
 
-plt.savefig(f"c_output_data/histogram{bins}.png")
+plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}.png")
 
 # Displaying the histogram
 #plt.show()
