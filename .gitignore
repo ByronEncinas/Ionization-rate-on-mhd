@@ -7,6 +7,10 @@ input_data
 venv
 .vscode
 
+b_submit.sh
+c_submit.sh
+jakar-venv*
+
 # png
 *.png
 *.json

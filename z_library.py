@@ -6,6 +6,157 @@ import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 
 
+""" b_ionization_model Methods """
+
+def pocket_finder(bmag):
+    from scipy.signal import find_peaks
+
+    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
+    peaks, _ = find_peaks(bmag, height=0)
+    magnetic_peaks = [bmag[p] for p in peaks]
+    _baseline = min(bmag) # global minima
+    _upline = max(magnetic_peaks) # global maxima
+    _ = magnetic_peaks.index(_upline) 
+    _indexglobalmax = peaks[_] # index of global maxima
+    
+    first_region = magnetic_peaks[:_]
+    second_region= magnetic_peaks[_+1:]
+    
+    print(peaks)
+    print(magnetic_peaks)
+    # I only care for peaks that are subsequently bigger than the last one up until the 
+
+    left_pockets = [(peaks[magnetic_peaks.index(first_region[0])], first_region[0])]  # Initialize result list with the first element of the input list
+    for i in range(1, len(first_region)):
+        if first_region[i] > first_region[i-1]:  # Compare current element with the last element in the result list
+            index = peaks[magnetic_peaks.index(first_region[i])]  # Find the corresponding index from 'peaks'
+            left_pockets.append((index, first_region[i])) # If current element is greater, add it to the result list
+    
+    right_pockets = [(peaks[magnetic_peaks.index(second_region[0])],second_region[0])]  # Initialize result list with the first element of the input list
+    for i in range(1, len(second_region)):
+        if second_region[i] < second_region[i - 1]:  # Compare current element with the previous element
+            index = peaks[magnetic_peaks.index(second_region[i])]  # Find the corresponding index from 'peaks'
+            right_pockets.append((index, second_region[i]))
+
+    print(left_pockets )
+    print(right_pockets)
+
+    plt.plot(bmag)
+    plt.plot(peaks, magnetic_peaks, "x", color="red")
+
+    plt.plot(_indexglobalmax, _upline, "x", color="black")
+
+    plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
+    #plt.show()
+
+    print(" Pocket Regions Obtained")
+
+    return left_pockets + right_pockets, (_indexglobalmax, bmag[_indexglobalmax])
+
+""" c_reduction_factor Methods """
+
+def visualize_pockets(bmag, cycle, plot=False):
+    import matplotlib.pyplot as plt
+    from scipy.signal import find_peaks
+    import copy
+
+    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
+    all_peaks, _ = find_peaks(bmag, height=0)
+    all_magnetic_peaks = [bmag[p] for p in all_peaks]
+    magnetic_peaks = all_magnetic_peaks.copy()
+
+    if magnetic_peaks:
+        index_global_max = all_peaks[np.argmax(magnetic_peaks)]
+    else:
+        # Handle the case when magnetic_peaks is empty
+        print("magnetic_peaks is empty, cannot compute argmax")
+        return (all_peaks, all_magnetic_peaks), (None, None)
+
+    index_global_max = all_peaks[np.argmax(magnetic_peaks)]
+    
+    # index_global_max = all_peaks[np.argmax(magnetic_peaks)] => magnetic_peaks can be an empty list 
+    # ValueError: attempt to get argmax of an empty sequence
+
+    baseline = min(bmag)
+    upline = max(magnetic_peaks)
+
+    # filter all
+    def filter_values(lst):
+        i = 1
+        while i < len(lst) - 1:
+            if lst[i] < lst[i - 1] or lst[i] < lst[i + 1]:
+                del lst[i]
+            else:
+                i += 1
+        return lst
+
+    # we want to comply with
+
+    # Example usage:
+    max_index = all_magnetic_peaks.index(max(all_magnetic_peaks))
+
+    first  = all_magnetic_peaks[:max_index+1].copy()
+    second = list(reversed(all_magnetic_peaks[max_index:].copy()))
+
+    first_filtered_list = filter_values(first)
+    second_filtered_list = filter_values(second)
+
+    complete_list = first_filtered_list[0:-1] + [bmag[index_global_max]] + list(reversed(second_filtered_list[0:-1]))
+    x = [all_magnetic_peaks.index(f) for f in complete_list]
+    y = [all_peaks[i] for i in x]
+
+    if plot:
+        # Create a figure and axes for the subplot layout
+        fig, axs = plt.subplots(3, 1, figsize=(8, 6))
+
+        # Plot the first set of data on the first subplot
+        axs[0].plot(bmag)
+        axs[0].plot(all_peaks, all_magnetic_peaks, "x", color="green")
+        axs[0].plot(index_global_max, upline, "x", color="black")
+        axs[0].plot(np.ones_like(bmag)*baseline, "--", color="gray")
+        axs[0].set_xlabel("Index")
+        axs[0].set_ylabel("Field")
+        axs[0].set_title("Actual Field Shape")
+        axs[0].legend(["bmag", "all peaks", "index_global_max", "baseline"])
+        axs[0].grid(True)
+
+        # Plot the second set of data on the second subplot
+        axs[1].plot(all_magnetic_peaks, marker='+',color='red')
+        axs[1].plot(x, complete_list, marker='x', color='grey')
+        axs[1].set_xlabel("Index")
+        axs[1].set_ylabel("Field")
+        axs[1].set_title("Reduced Set (red) & Pockets (grey)")
+        axs[1].legend(["Reduced Field", "Pockets"])
+        axs[1].grid(True)
+
+        # field shape into 
+        axs[2].plot(all_peaks,all_magnetic_peaks, marker='+', color='red')
+        axs[2].plot(y, complete_list, marker='x', color='grey')
+        axs[2].set_xlabel("Index")
+        axs[2].set_ylabel("Field")
+        axs[2].set_title("Reduced Set (red) & Pockets (grey)")
+        axs[2].legend(["Reduced Field", "Pockets"])
+        axs[2].grid(True)
+
+        # Adjust layout to prevent overlap
+        plt.tight_layout()
+
+        # Save the figure
+        plt.savefig(f"c_output_data/c_output_field_shape{cycle}.png")
+
+        # Show the plot
+        plt.show()
+
+    return (y, complete_list), (index_global_max, bmag[index_global_max])
+
+def find_insertion_point(index_pocket, p_r):
+    for i in range(len(index_pocket)):
+        if p_r < index_pocket[i]:
+            return i  # Insert before index i
+    return len(index_pocket)  # Insert at the end if p_r is greater than or equal to all elements
+
+""" Integration Methods """
+
 def magnitude(new_vector, prev_vector=[0.0,0.0,0.0]): 
     return np.sqrt(sum([(new_vector[i]-prev_vector[i])*(new_vector[i]-prev_vector[i]) for i in range(len(new_vector))]))
 
@@ -72,170 +223,6 @@ def run_second_order(const, position, velocity, Bx, By, Bz, timestep):
     new_position = position + timestep * (k_1 + 2 * k_2 + 2 * k_3 + k_4) / 6
 
     return new_position, new_velocity
-
-def pocket_finder(bmag): # deprecated
-    from scipy.signal import find_peaks
-
-    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
-    all_peaks, _ = find_peaks(bmag, height=0)
-    all_magnetic_peaks = [bmag[p] for p in all_peaks]
-    print(all_magnetic_peaks)
-    _baseline = min(bmag) # global minima
-    _upline = max(all_magnetic_peaks) # global maxima
-    _ = all_magnetic_peaks.index(_upline) 
-    _indexglobalmax =all_peaks[_] # index of global maxima
-    
-    first_region = all_magnetic_peaks[:_]
-    second_region= all_magnetic_peaks[_+1:]
-    
-    #print(peaks)
-    #print(magnetic_peaks)
-    # I only care forall_peaks that are subsequently bigger than the last one up until the 
-
-    left_pockets = [(all_peaks[all_magnetic_peaks.index(first_region[0])], first_region[0])]  # Initialize result list with the first element of the input list
-    for i in range(1, len(first_region)):
-        if first_region[i] > first_region[i-1]:  # Compare current element with the last element in the result list
-            index =all_peaks[all_magnetic_peaks.index(first_region[i])]  # Find the corresponding index from 'peaks'
-            left_pockets.append((index, first_region[i])) # If current element is greater, add it to the result list
-    
-    right_pockets = [(all_peaks[all_magnetic_peaks.index(second_region[0])],second_region[0])]  # Initialize result list with the first element of the input list
-    for i in range(1, len(second_region)):
-        if second_region[i] < second_region[i - 1]:  # Compare current element with the previous element
-            index =all_peaks[all_magnetic_peaks.index(second_region[i])]  # Find the corresponding index from 'peaks'
-            right_pockets.append((index, second_region[i]))
-
-    left_index = [lp[0] for lp in left_pockets]
-    right_index = [rp[0] for rp in right_pockets]
-
-    indexes = [lp[0] for lp in left_pockets] + [rp[0] for rp in right_pockets]
-    bfield_at_index = [lp[1] for lp in left_pockets] + [rp[1] for rp in right_pockets]
-
-    print(left_index)
-    print(right_index)
-
-    plt.plot(bmag)
-    
-    plt.plot(indexes, bfield_at_index , "+", color="red")
-    plt.plot(all_peaks, all_magnetic_peaks, "x", color="green")
-
-    plt.plot(_indexglobalmax, _upline, "x", color="black")
-
-    plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
-    plt.show()
-    
-    plt.plot(all_peaks, all_magnetic_peaks, "--", color="green")
-
-    plt.plot(_indexglobalmax, _upline, "x", color="black")
-
-    plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
-    plt.show()
-
-    print("Pocket Regions Obtained")
-
-    return left_pockets + right_pockets, (_indexglobalmax, bmag[_indexglobalmax])
-
-def visualize_pockets(bmag, cycle, plot=False):
-    import matplotlib.pyplot as plt
-    from scipy.signal import find_peaks
-    import copy
-
-    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
-    all_peaks, _ = find_peaks(bmag, height=0)
-    all_magnetic_peaks = [bmag[p] for p in all_peaks]
-    magnetic_peaks = all_magnetic_peaks.copy()
-
-    if magnetic_peaks:
-        index_global_max = all_peaks[np.argmax(magnetic_peaks)]
-    else:
-        # Handle the case when magnetic_peaks is empty
-        print("magnetic_peaks is empty, cannot compute argmax")
-        return (all_peaks, all_magnetic_peaks), (None, None)
-
-    index_global_max = all_peaks[np.argmax(magnetic_peaks)]
-    
-    # index_global_max = all_peaks[np.argmax(magnetic_peaks)] => magnetic_peaks can be an empty list 
-    # ValueError: attempt to get argmax of an empty sequence
-
-    baseline = min(bmag)
-    upline = max(magnetic_peaks)
-
-    # filter all
-    def filter_values(lst):
-        i = 1
-        while i < len(lst) - 1:
-            if lst[i] < lst[i - 1] or lst[i] < lst[i + 1]:
-                del lst[i]
-            else:
-                i += 1
-        return lst
-
-    # we want to comply with
-
-    # Example usage:
-    max_index = all_magnetic_peaks.index(max(all_magnetic_peaks))
-
-    first  = all_magnetic_peaks[:max_index+1].copy()
-    second = list(reversed(all_magnetic_peaks[max_index:].copy()))
-
-    first_filtered_list = filter_values(first)
-    second_filtered_list = filter_values(second)
-
-
-
-
-    complete_list = first_filtered_list[0:-1] + [bmag[index_global_max]] + list(reversed(second_filtered_list[0:-1]))
-    x = [all_magnetic_peaks.index(f) for f in complete_list]
-    y = [all_peaks[i] for i in x]
-
-    if plot:
-        # Create a figure and axes for the subplot layout
-        fig, axs = plt.subplots(3, 1, figsize=(8, 6))
-
-        # Plot the first set of data on the first subplot
-        axs[0].plot(bmag)
-        axs[0].plot(all_peaks, all_magnetic_peaks, "x", color="green")
-        axs[0].plot(index_global_max, upline, "x", color="black")
-        axs[0].plot(np.ones_like(bmag)*baseline, "--", color="gray")
-        axs[0].set_xlabel("Index")
-        axs[0].set_ylabel("Field")
-        axs[0].set_title("Actual Field Shape")
-        axs[0].legend(["bmag", "all peaks", "index_global_max", "baseline"])
-        axs[0].grid(True)
-
-        # Plot the second set of data on the second subplot
-        axs[1].plot(all_magnetic_peaks, marker='+',color='red')
-        axs[1].plot(x, complete_list, marker='x', color='grey')
-        axs[1].set_xlabel("Index")
-        axs[1].set_ylabel("Field")
-        axs[1].set_title("Reduced Set (red) & Pockets (grey)")
-        axs[1].legend(["Reduced Field", "Pockets"])
-        axs[1].grid(True)
-
-        # field shape into 
-        axs[2].plot(all_peaks,all_magnetic_peaks, marker='+', color='red')
-        axs[2].plot(y, complete_list, marker='x', color='grey')
-        axs[2].set_xlabel("Index")
-        axs[2].set_ylabel("Field")
-        axs[2].set_title("Reduced Set (red) & Pockets (grey)")
-        axs[2].legend(["Reduced Field", "Pockets"])
-        axs[2].grid(True)
-
-        # Adjust layout to prevent overlap
-        plt.tight_layout()
-
-        # Save the figure
-        plt.savefig(f"c_output_data/c_output_field_shape{cycle}.png")
-
-        # Show the plot
-        plt.show()
-
-    return (y, complete_list), (index_global_max, bmag[index_global_max])
-
-def find_insertion_point(index_pocket, p_r):
-    for i in range(len(index_pocket)):
-        if p_r < index_pocket[i]:
-            return i  # Insert before index i
-    return len(index_pocket)  # Insert at the end if p_r is greater than or equal to all elements
 
 """### Vector Functions"""
 

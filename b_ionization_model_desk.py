@@ -5,6 +5,7 @@ from scipy.integrate import quad
 import matplotlib.pyplot as plt
 import copy
 import sys
+from z_library import *
 
 """  
 Methods
@@ -36,189 +37,6 @@ if False: # import data colapse to see statements
     ion_frac = np.array(np.load("input_data/ionization_fraction.npy", mmap_mode='r'))
 
 gas_den = np.array(np.load("input_data/gas_number_density.npy", mmap_mode='r'))
-
-def magnitude(new_vector, prev_vector=[0.0, 0.0, 0.0]):
-    """
-    Calculate the magnitude of a vector.
-    
-    Args:
-        new_vector (list): The new vector.
-        prev_vector (list): The previous vector. Default is [0.0, 0.0, 0.0].
-        
-    Returns:
-        float: The magnitude of the vector.
-    """
-    import numpy as np
-    return np.sqrt(sum([(new_vector[i] - prev_vector[i]) ** 2 for i in range(len(new_vector))]))
-
-def eul_int(fderiv, timestep):
-    """
-    Perform Euler integration step.
-    
-    Args:
-        fderiv (float): First derivative.
-        timestep (float): Time step.
-        
-    Returns:
-        float: Result of the Euler integration step.
-    """
-    return fderiv * timestep
-
-def run_next_step(x, y, z, scalar_f, timestep):
-    '''
-    Perform a numerical integration step using the Runge-Kutta method.
-
-    Args:
-        x (float): X position.
-        y (float): Y position.
-        z (float): Z position.
-        scalar_f: Scalar field.
-        timestep (float): Time step.
-
-    Returns:
-        float: Result of the numerical integration step.
-    '''
-    k_1, k_2, k_3, k_4 = 0.0, 0.0, 0.0, 0.0
-
-    k_1 = interpolate_scalar_field(x, y, z, scalar_f)
-    k_2 = interpolate_scalar_field(x+0.5*k_1*timestep, y+0.5*k_1*timestep, z + 0.5*k_1*timestep, scalar_f)
-    k_3 = interpolate_scalar_field(x+0.5*k_2*timestep, y+0.5*k_2*timestep, z + 0.5*k_2*timestep, scalar_f)
-    k_4 = interpolate_scalar_field(x+k_3*timestep, y+k_3*timestep, z + k_3*timestep, scalar_f)
-
-    return (k_1 + 2 * k_2 + 2 * k_3 + k_4) / 6
-
-def Ind(i):
-  '''
-    Indicator Function
-    Function finds out if given a ds value for the dimensions of a cube ds x ds x ds grid, a given point i,j,k is inside or outside.
-
-    Args:
-        i (int): Dimension value.
-
-    Returns:
-        int: 1 if inside, 0 if outside.
-  '''
-  stat_i = 0<=i<=128
-
-  if stat_i:
-    return 1
-  else:
-    return 0
-
-def ingrid(i,j,k, index = None):
-  '''
-    Function finds out if given a ds value for the dimensions of a cube ds x ds x ds grid, a given point i,j,k is inside or outside.
-    we want to obtain a boolean function that identifies if a particle is outside of the grid, and the element(s) that are out of bounds.
-
-    Args:
-        i (int): X-coordinate.
-        j (int): Y-coordinate.
-        k (int): Z-coordinate.
-        index: Not used in this function.
-
-    Returns:
-        list: [True, True, True] if inside, [False, True, True] if outside of grid in corresponding dimension(s).
-  '''
-  # ds = 128 always!
-  # True = in the grid, False = out of grid
-  stat_i = False if (i < 0 or i > 128) else True
-  stat_j = False if (j < 0 or j > 128) else True
-  stat_k = False if (k < 0 or k > 128) else True
-
-  vector = [stat_i,stat_j,stat_k]
-  if all(vector): # if in grid
-    return vector # [True, True, True]
-  else: # if not in grid
-    index = [not comp for comp in vector] # if vector = [True, False, False], index = [False, True, True] so all out of grid components are True
-    return index
-
-def find_enclosing_scalars(i, j, k): # implementing Inverse Distance Weighting (Shepard's method)
-    '''
-    Find scalar values enclosing a given point in a cube grid.
-
-    Args:
-        i (float): X-coordinate.
-        j (float): Y-coordinate.
-        k (float): Z-coordinate.
-
-    Returns:
-        list: List of scalar values.
-    '''
-    scalars = []
-    neighbors = [
-        (0, 0, 0),  # Vertex at the origin
-        (0, 0, 1),  # Vertex on the x-axis
-        (0, 1, 0),  # Vertex on the y-axis
-        (0, 1, 1),  # Vertex on the z-axis
-        (1, 0, 0),  # Vertex on the xy-plane
-        (1, 0, 1),  # Vertex on the xz-plane
-        (1, 1, 0),  # Vertex on the yz-plane
-        (1, 1, 1)   # Vertex in all three dimensions
-    ]
-    point = [np.floor(i), np.floor(j), np.floor(k)] # three co-ordinates
-
-    for neighbor in neighbors: # let's save all scalars in the 6 co-ordinates
-        ni, nj, nk = neighbor # this is a given point
-
-        if 0 <= i + ni and 0 <= j + nj and 0 <= k + nk:
-            dx = ni + i
-            dy = nj + j
-            dz = nk + k
-            scalars.append(np.array([np.floor(dx), np.floor(dy), np.floor(dz)]))
-    return scalars
-
-def interpolate_scalar_field(p_i, p_j, p_k, scalar_field):
-
-    # Origin of new RF primed: O' = [0,0,0] but O = [p_i, p_j, p_k] in not primed RF.
-    u, v, w = p_i - np.floor(p_i), p_j - np.floor(p_j), p_k - np.floor(p_k)
-
-    # Find the eight coordinates enclosing the chosen point
-    coordinates = find_enclosing_scalars(p_i, p_j, p_k)
-
-    # Initialize interpolated_vector
-    interpolated_scalar = 0.0
-    cum_sum, cum_inv_dis= 0.0, 1.0
-
-    if True:
-      for coo in coordinates:
-            # coordinates of cube vertices around point
-            i, j, k = int(coo[0]), int(coo[1]), int(coo[2]) # O' position
-
-            # distance from point to vertice of cube
-            distance = magnitude([i - p_i, j - p_j, k - p_k]) # real distance
-            #print(distance)
-
-            # base case
-            if distance <= 0.001:
-                #print(f"known scalar field at [{p_i},{p_j},{p_k}]")
-                return scalar_field[int(p_i)][int(p_j)][int(p_k)]
-
-            cum_sum += scalar_field[i][j][k]/ (distance + 1e-10) ** 2
-            #print(scalar_field[i][j][k],(distance + 1e-10) ** 2)
-            cum_inv_dis += 1 / (distance + 1e-10) ** 2
-    else:
-       new_coords = [[c[0],c[1],c[2]] for c in coordinates if all(ingrid(c[0],c[1],c[2]))]
-       index = ingrid(p_i,p_j,p_k)
-       complementary = [[new_coords[im][0]+index[0],new_coords[im][1]++index[1],new_coords[im][2]+index[2]] for im, boo in enumerate(new_coords)]
-       coordinates = complementary+new_coords
-       for coo in coordinates:
-            # coordinates of cube vertices around point
-            i, j, k = int(coo[0]), int(coo[1]), int(coo[2]) # O' position
-
-            # distance from point to vertice of cube
-            distance = magnitude([i - p_i, j - p_j, k - p_k]) # real distance
-            #print(scalar_field[i][j][k],(distance + 1e-10) ** 2,np.exp(-distance))
-
-            # base case
-            if distance <= 0.001:
-                #print(f"known scalar field at [{p_i},{p_j},{p_k}]")
-                return scalar_field[int(p_i)][int(p_j)][int(p_k)]
-
-            cum_sum += scalar_field[i][j][k]*np.exp(-distance**(3)/8)/ (distance + 1e-10) ** 2
-            cum_inv_dis += 1 / (distance + 1e-10) ** 2
-
-    interpolated_scalar = cum_sum / cum_inv_dis
-    return interpolated_scalar
 
 def process_line(line):
     """
@@ -310,52 +128,6 @@ Jstar = 2.4e+15*(10e+6)**(0.1)/(Enot**2.8)
 
 # Energy scale for cosmic rays (1 MeV = 1e+6 eV)
 Estar = 1.0e+6
-
-
-def pocket_finder():
-    from scipy.signal import find_peaks
-
-    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
-    peaks, _ = find_peaks(bmag, height=0)
-    magnetic_peaks = [bmag[p] for p in peaks]
-    _baseline = min(bmag) # global minima
-    _upline = max(magnetic_peaks) # global maxima
-    _ = magnetic_peaks.index(_upline) 
-    _indexglobalmax = peaks[_] # index of global maxima
-    
-    first_region = magnetic_peaks[:_]
-    second_region= magnetic_peaks[_+1:]
-    
-    print(peaks)
-    print(magnetic_peaks)
-    # I only care for peaks that are subsequently bigger than the last one up until the 
-
-    left_pockets = [(peaks[magnetic_peaks.index(first_region[0])], first_region[0])]  # Initialize result list with the first element of the input list
-    for i in range(1, len(first_region)):
-        if first_region[i] > first_region[i-1]:  # Compare current element with the last element in the result list
-            index = peaks[magnetic_peaks.index(first_region[i])]  # Find the corresponding index from 'peaks'
-            left_pockets.append((index, first_region[i])) # If current element is greater, add it to the result list
-    
-    right_pockets = [(peaks[magnetic_peaks.index(second_region[0])],second_region[0])]  # Initialize result list with the first element of the input list
-    for i in range(1, len(second_region)):
-        if second_region[i] < second_region[i - 1]:  # Compare current element with the previous element
-            index = peaks[magnetic_peaks.index(second_region[i])]  # Find the corresponding index from 'peaks'
-            right_pockets.append((index, second_region[i]))
-
-    print(left_pockets )
-    print(right_pockets)
-
-    plt.plot(bmag)
-    plt.plot(peaks, magnetic_peaks, "x", color="red")
-
-    plt.plot(_indexglobalmax, _upline, "x", color="black")
-
-    plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
-    #plt.show()
-
-    print(" Pocket Regions Obtained")
-
-    return left_pockets + right_pockets, (_indexglobalmax, bmag[_indexglobalmax])
 
 def PowerLaw(Eparam, E, power, const):
     """
@@ -489,7 +261,7 @@ def Ionization(reverse, mirror=False):
 
         import copy
 
-        pockets, globalmaxinfo = pocket_finder()
+        pockets, globalmaxinfo = pocket_finder(bmag)
         print(pockets)
 
         globalmax_index = globalmaxinfo[0]

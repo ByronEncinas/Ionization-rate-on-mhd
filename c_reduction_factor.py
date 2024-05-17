@@ -287,25 +287,24 @@ if len(sys.argv) >= 2:
     bins = int(sys.argv[2])
     print("bins:", bins)
 else:
-    bins = 100
+    bins = int(sys.argv[1])//10
     print("bins:", bins)
 
-hstscale = max(reduction_factor)
-normalized_reduction_factor = [reduction_factor[i]/hstscale for i in range(len(reduction_factor))]
+inverse_reduction_factor = [1/reduction_factor[i] for i in range(len(reduction_factor))]
 
 # Create a figure and axes objects
 fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
 # Plot histograms on the respective axes
 axs[0].hist(reduction_factor, bins=bins, color='skyblue', edgecolor='black')
-axs[1].hist(normalized_reduction_factor, density=True, bins=bins, color='skyblue', edgecolor='black')
+axs[1].hist(inverse_reduction_factor, bins=bins, color='skyblue', edgecolor='black')
 
 # Adding labels and title for each subplot
-axs[0].set_title('Histogram of Reduction Factor')
+axs[0].set_title('Histogram of Reduction Factor (R)')
 axs[0].set_xlabel('Bins')
 axs[0].set_ylabel('Frequency')
 
-axs[1].set_title('Normalized Histogram of Reduction Factor')
+axs[1].set_title('Histogram of Inverse Reduction Factor (1/R)')
 axs[1].set_xlabel('Bins')
 axs[1].set_ylabel('Frequency')
 
@@ -316,4 +315,4 @@ plt.tight_layout()
 plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}.png")
 
 # Show the plot
-plt.show()
+#plt.show()
