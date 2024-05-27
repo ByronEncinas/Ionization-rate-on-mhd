@@ -265,7 +265,7 @@ while cycle < max_cycles:
 import json
 
 # Specify the file path
-file_path = 'prev_meeting_random_distributed_reduction_factor.json'
+file_path = 'random_distributed_reduction_factor.json'
 
 # Write the list data to a JSON file
 with open(file_path, 'w') as json_file:
