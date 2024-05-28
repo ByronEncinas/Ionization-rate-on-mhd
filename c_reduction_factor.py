@@ -289,6 +289,10 @@ if len(sys.argv) >= 2:
 else:
     bins = int(sys.argv[1])//10
     print("bins:", bins)
+if sys.argv[3]:
+    name = sys.argv[3]
+else:
+    name = ""
 
 inverse_reduction_factor = [1/reduction_factor[i] for i in range(len(reduction_factor))]
 
@@ -312,7 +316,7 @@ axs[1].set_ylabel('Frequency')
 plt.tight_layout()
 
 # Save the figure
-plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}.png")
+plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}"+name+".png")
 
 # Show the plot
 #plt.show()
