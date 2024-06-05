@@ -1,4 +1,5 @@
 from z_library import *
+from collections import Counter
 import json
 
 """  
@@ -92,7 +93,10 @@ reduction_factor = []
 
 import random
 
-"""# Calculating """
+"""
+# Calculating Histogram for Reduction Factor in Randomized Positions in the 128**3 Cube 
+
+"""
 # flow control to repeat calculations in no peak situations
 cycle = 0 
 
@@ -143,6 +147,7 @@ while cycle < max_cycles:
         count = 0                                             # iterator count
 
         """# Calculating Trajectory"""
+
         # We are looking into the two nearest critical points, so let's look at points were first derivative 
         for time in timestep:
             try:
@@ -157,8 +162,7 @@ while cycle < max_cycles:
                     unito = Bp_run/bf_mag
                     forward_cur_pos += unito*delta
                         
-                    radius_vector.append(forward_cur_pos.tolist())
-                        
+                    radius_vector.append(forward_cur_pos.tolist())                        
             except:
                 print("Particle got out of the Grid")
                 break
@@ -171,12 +175,13 @@ while cycle < max_cycles:
 
             count += 1
         
-        return (radius_vector, bfield)
+        return (distance, radius_vector, bfield)
 
-    left_radius_vector, left_bfield_magnitudes = trajectory(point_i, point_j, point_k, -1)
-    right_radius_vector, right_bfield_magnitudes = trajectory(point_i, point_j, point_k, 1)
+    left_distance, left_radius_vector, left_bfield_magnitudes = trajectory(point_i, point_j, point_k, -1)
+    right_distance,right_radius_vector, right_bfield_magnitudes = trajectory(point_i, point_j, point_k, 1)
 
      # this [1:] cut is because both lists contain the initial point
+    distance = list(reversed(left_distance)) + right_distance[1:]
     radius_vector = list(reversed(left_radius_vector)) + right_radius_vector[1:]
     bfield        = list(reversed(left_bfield_magnitudes)) + right_bfield_magnitudes[1:]
 
@@ -197,10 +202,6 @@ while cycle < max_cycles:
     if len(index_pocket) < 2:
         # it there a minimum value of peaks we can work with? yes, two
         continue
-
-    #print("")
-    #print("index pocket: ", index_pocket)
-    #print("field pocket: ", field_pocket)
 
     globalmax_index = global_info[0]
     globalmax_field = global_info[1]
@@ -228,7 +229,7 @@ while cycle < max_cycles:
 
     #print()
     print("Random Index:", p_r, "assoc. B(s_r):",B_r)
-    print(index_pocket, p_i)
+    print("Maxima Values related to pockets: ",len(index_pocket), p_i)
 
     if p_i is not None:
         # If p_i is not None, select the values at indices p_i-1 and p_i
@@ -248,6 +249,9 @@ while cycle < max_cycles:
         reduction_factor.append(R)
         cycle += 1
     else:
+        R = 1
+        reduction_factor.append(1)
+        cycle += 1
         continue
     
     print("Closest local maxima 'p':", closest_values)
@@ -256,11 +260,13 @@ while cycle < max_cycles:
         print("Bl: ", B_l, " B_r/B_l =", B_r/B_l, "< 1 ") 
     except:
         # this statement won't reach cycle += 1 so the cycle will continue again.
-        continue
+        print("Bl: ", B_l, " B_r/B_l =", B_r/B_l, "> 1 so CRs are not affected => R = 1") 
+        
     """ 
     bs: where bs is the field magnitude at the random point chosen 
     bl: magnetic at position s of the trajectory
     """
+    print("\n",len(reduction_factor),"\n")
     
 import json
 
@@ -270,7 +276,6 @@ file_path = 'random_distributed_reduction_factor.json'
 # Write the list data to a JSON file
 with open(file_path, 'w') as json_file:
     json.dump(reduction_factor, json_file)
-
 
 print(reduction_factor)
 """# Graphs"""
@@ -289,10 +294,12 @@ if len(sys.argv) >= 2:
 else:
     bins = int(sys.argv[1])//10
     print("bins:", bins)
-if sys.argv[3]:
-    name = sys.argv[3]
-else:
-    name = ""
+
+red_fact_count = Counter(reduction_factor)
+inv_red_fact_count = Counter(reduction_factor)
+
+print(red_fact_count,"\n")
+print(inv_red_fact_count)
 
 inverse_reduction_factor = [1/reduction_factor[i] for i in range(len(reduction_factor))]
 
@@ -316,7 +323,8 @@ axs[1].set_ylabel('Frequency')
 plt.tight_layout()
 
 # Save the figure
-plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}"+name+".png")
+#plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}"+name+".png")
+plt.savefig(f"histogramdata={len(reduction_factor)}bins={bins}.png")
 
 # Show the plot
 #plt.show()

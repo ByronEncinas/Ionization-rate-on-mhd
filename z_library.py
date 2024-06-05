@@ -107,7 +107,7 @@ def visualize_pockets(bmag, cycle, plot=False):
 
     if plot:
         # Create a figure and axes for the subplot layout
-        fig, axs = plt.subplots(3, 1, figsize=(8, 6))
+        fig, axs = plt.subplots(2, 1, figsize=(8, 6))
 
         # Plot the first set of data on the first subplot
         axs[0].plot(bmag)
@@ -120,6 +120,16 @@ def visualize_pockets(bmag, cycle, plot=False):
         axs[0].legend(["bmag", "all peaks", "index_global_max", "baseline"])
         axs[0].grid(True)
 
+        # field shape into 
+        axs[1].plot(all_peaks,all_magnetic_peaks, marker='+', color='red')
+        axs[1].plot(y, complete_list, marker='x', color='grey')
+        axs[1].set_xlabel("Index")
+        axs[1].set_ylabel("Field")
+        axs[1].set_title("Reduced Set (red) & Pockets (grey)")
+        axs[1].legend(["Reduced Field", "Pockets"])
+        axs[1].grid(True)
+        
+        """ 
         # Plot the second set of data on the second subplot
         axs[1].plot(all_magnetic_peaks, marker='+',color='red')
         axs[1].plot(x, complete_list, marker='x', color='grey')
@@ -128,15 +138,7 @@ def visualize_pockets(bmag, cycle, plot=False):
         axs[1].set_title("Reduced Set (red) & Pockets (grey)")
         axs[1].legend(["Reduced Field", "Pockets"])
         axs[1].grid(True)
-
-        # field shape into 
-        axs[2].plot(all_peaks,all_magnetic_peaks, marker='+', color='red')
-        axs[2].plot(y, complete_list, marker='x', color='grey')
-        axs[2].set_xlabel("Index")
-        axs[2].set_ylabel("Field")
-        axs[2].set_title("Reduced Set (red) & Pockets (grey)")
-        axs[2].legend(["Reduced Field", "Pockets"])
-        axs[2].grid(True)
+         """
 
         # Adjust layout to prevent overlap
         plt.tight_layout()
