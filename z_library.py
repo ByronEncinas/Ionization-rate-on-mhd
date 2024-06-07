@@ -7,138 +7,53 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 """ b_ionization_model Methods """
-
-def pocket_finder(bmag):
-    from scipy.signal import find_peaks
-
-    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
-    peaks, _ = find_peaks(bmag, height=0)
-    magnetic_peaks = [bmag[p] for p in peaks]
-    _baseline = min(bmag) # global minima
-    _upline = max(magnetic_peaks) # global maxima
-    _ = magnetic_peaks.index(_upline) 
-    _indexglobalmax = peaks[_] # index of global maxima
-    
-    first_region = magnetic_peaks[:_]
-    second_region= magnetic_peaks[_+1:]
-    
-    print(peaks)
-    print(magnetic_peaks)
-    # I only care for peaks that are subsequently bigger than the last one up until the 
-
-    left_pockets = [(peaks[magnetic_peaks.index(first_region[0])], first_region[0])]  # Initialize result list with the first element of the input list
-    for i in range(1, len(first_region)):
-        if first_region[i] > first_region[i-1]:  # Compare current element with the last element in the result list
-            index = peaks[magnetic_peaks.index(first_region[i])]  # Find the corresponding index from 'peaks'
-            left_pockets.append((index, first_region[i])) # If current element is greater, add it to the result list
-    
-    right_pockets = [(peaks[magnetic_peaks.index(second_region[0])],second_region[0])]  # Initialize result list with the first element of the input list
-    for i in range(1, len(second_region)):
-        if second_region[i] < second_region[i - 1]:  # Compare current element with the previous element
-            index = peaks[magnetic_peaks.index(second_region[i])]  # Find the corresponding index from 'peaks'
-            right_pockets.append((index, second_region[i]))
-
-    print(left_pockets )
-    print(right_pockets)
-
-    plt.plot(bmag)
-    plt.plot(peaks, magnetic_peaks, "x", color="red")
-
-    plt.plot(_indexglobalmax, _upline, "x", color="black")
-
-    plt.plot(np.ones_like(bmag)*_baseline, "--", color="gray")
-    #plt.show()
-
-    print(" Pocket Regions Obtained")
-
-    return left_pockets + right_pockets, (_indexglobalmax, bmag[_indexglobalmax])
-
 """ c_reduction_factor Methods """
 
-def visualize_pockets(bmag, cycle, plot=False):
-    import matplotlib.pyplot as plt
-    from scipy.signal import find_peaks
-    import copy
-
-    # Before running, we want to be able to locate all local-maximums as well as the global-maximum
-    all_peaks, _ = find_peaks(bmag, height=0)
-    all_magnetic_peaks = [bmag[p] for p in all_peaks]
-    magnetic_peaks = all_magnetic_peaks.copy()
-
-    if magnetic_peaks:
-        index_global_max = all_peaks[np.argmax(magnetic_peaks)]
-    else:
-        # Handle the case when magnetic_peaks is empty
-        print("magnetic_peaks is empty, cannot compute argmax")
-        return (all_peaks, all_magnetic_peaks), (None, None)
-
-    index_global_max = all_peaks[np.argmax(magnetic_peaks)]
-    
-    # index_global_max = all_peaks[np.argmax(magnetic_peaks)] => magnetic_peaks can be an empty list 
-    # ValueError: attempt to get argmax of an empty sequence
-
+def pocket_finder(bmag, cycle=0, plot =False):
+    """  
+    j = i+1 > i
+    """
+    Bj = bmag[0]
+    Bi = 0.0
+    lindex = []
+    lpeaks = []
+    for B in bmag:
+        Bj = B
+        if Bj < Bi and (len(lpeaks) == 0 or Bi > lpeaks[-1] ): # if True, then we have a peak
+            lindex.append(bmag.index(Bi))
+            lpeaks.append(Bi)
+        Bi = B
+    Bj = bmag[-1]
+    Bi = 0.0
+    rindex = []
+    rpeaks = []
+    for B in reversed(bmag):
+        Bj = B
+        if Bj < Bi and (len(rpeaks) == 0 or Bi > rpeaks[-1]): # if True, then we have a peak
+            rindex.append(bmag.index(Bi))
+            rpeaks.append(Bi)
+        Bi = B
+    peaks = lpeaks + list(reversed(rpeaks))[1:]
+    indexes = lindex+list(reversed(rindex))[1:] 
     baseline = min(bmag)
-    upline = max(magnetic_peaks)
-
-    # filter all
-    def filter_values(lst):
-        i = 1
-        while i < len(lst) - 1:
-            if lst[i] < lst[i - 1] or lst[i] < lst[i + 1]:
-                del lst[i]
-            else:
-                i += 1
-        return lst
-
-    # we want to comply with
-
-    # Example usage:
-    max_index = all_magnetic_peaks.index(max(all_magnetic_peaks))
-
-    first  = all_magnetic_peaks[:max_index+1].copy()
-    second = list(reversed(all_magnetic_peaks[max_index:].copy()))
-
-    first_filtered_list = filter_values(first)
-    second_filtered_list = filter_values(second)
-
-    complete_list = first_filtered_list[0:-1] + [bmag[index_global_max]] + list(reversed(second_filtered_list[0:-1]))
-    x = [all_magnetic_peaks.index(f) for f in complete_list]
-    y = [all_peaks[i] for i in x]
-
+    upline = max(bmag)
+    index_global_max = bmag.index(upline)
+    
     if plot:
         # Create a figure and axes for the subplot layout
-        fig, axs = plt.subplots(2, 1, figsize=(8, 6))
+        fig, axs = plt.subplots(1, 1, figsize=(8, 6))
 
         # Plot the first set of data on the first subplot
-        axs[0].plot(bmag)
-        axs[0].plot(all_peaks, all_magnetic_peaks, "x", color="green")
-        axs[0].plot(index_global_max, upline, "x", color="black")
-        axs[0].plot(np.ones_like(bmag)*baseline, "--", color="gray")
-        axs[0].set_xlabel("Index")
-        axs[0].set_ylabel("Field")
-        axs[0].set_title("Actual Field Shape")
-        axs[0].legend(["bmag", "all peaks", "index_global_max", "baseline"])
-        axs[0].grid(True)
+        axs.plot(bmag)
+        axs.plot(indexes,peaks, "x", color="green")
+        axs.plot(index_global_max, upline, "x", color="black")
+        axs.plot(np.ones_like(bmag)*baseline, "--", color="gray")
+        axs.set_xlabel("Index")
+        axs.set_ylabel("Field")
+        axs.set_title("Actual Field Shape")
+        axs.legend(["bmag", "all peaks", "index_global_max", "baseline"])
+        axs.grid(True)
 
-        # field shape into 
-        axs[1].plot(all_peaks,all_magnetic_peaks, marker='+', color='red')
-        axs[1].plot(y, complete_list, marker='x', color='grey')
-        axs[1].set_xlabel("Index")
-        axs[1].set_ylabel("Field")
-        axs[1].set_title("Reduced Set (red) & Pockets (grey)")
-        axs[1].legend(["Reduced Field", "Pockets"])
-        axs[1].grid(True)
-        
-        """ 
-        # Plot the second set of data on the second subplot
-        axs[1].plot(all_magnetic_peaks, marker='+',color='red')
-        axs[1].plot(x, complete_list, marker='x', color='grey')
-        axs[1].set_xlabel("Index")
-        axs[1].set_ylabel("Field")
-        axs[1].set_title("Reduced Set (red) & Pockets (grey)")
-        axs[1].legend(["Reduced Field", "Pockets"])
-        axs[1].grid(True)
-         """
 
         # Adjust layout to prevent overlap
         plt.tight_layout()
@@ -148,9 +63,8 @@ def visualize_pockets(bmag, cycle, plot=False):
 
         # Show the plot
         plt.show()
-
-    return (y, complete_list), (index_global_max, bmag[index_global_max])
-
+    return (indexes, peaks), (index_global_max, upline)
+            
 def find_insertion_point(index_pocket, p_r):
     for i in range(len(index_pocket)):
         if p_r < index_pocket[i]:
@@ -333,9 +247,45 @@ def find_enclosing_scalars(i, j, k):
             scalars.append(np.array([np.floor(dx), np.floor(dy), np.floor(dz)]))
     return scalars
 
-def interpolate_scalar_field(p_i, p_j, p_k, scalar_field, epsilon=1e-10): # implementing Inverse Distance Weighting (Shepard's method)
+def interpolate_scalar_field(point_i, point_j, point_k, scalar_field): 
+    u, v, w = point_i - np.floor(point_i), point_j - np.floor(point_j), point_k - np.floor(point_k)
+
+    # Find the eight vectors enclosing the chosen point
+    cube = find_enclosing_vectors(point_i, point_j, point_k)
+
+    # Initialize Bp
+    interpolated_vector = np.array([0.0, 0.0, 0.0])
+
+    scalars = []
+
+    for c in cube:
+        i, j, k = int(c[0]), int(c[1]), int(c[2])
+
+        # Check if indices are within the bounds of the magnetic field arrays
+        if 0 <= i < scalar_field.shape[0] and 0 <= j < scalar_field.shape[0] and 0 <= k < scalar_field.shape[0]:
+
+            scalars.append(scalar_field[i][j][k])
+            #print(i,j,k,scalar_field[i][j][k])
+        else:
+            # Handle the case where indices are out of bounds (you may choose to do something specific here)
+            pass
+            #print(f"Indices out of bounds: {i}, {j}, {k}")
+    
+    interpolated_scalar = 0.0
+    coefficients = [(1 - u) * (1 - v) * (1 - w),  (1 - u) * (1 - v) * w, (1 - u) * v * (1 - w) ,\
+                    (1 - u) * v * w , u * (1 - v) * (1 - w),  u * (1 - v) * w, \
+                    u * v * (1 - w),  u * v * w] 
+    
+    for coeff, scalar in zip(coefficients, scalars):
+        #print(scalar, coeff)
+        interpolated_scalar += coeff * scalar
+
+    return interpolated_scalar
+
+
 
     
+def _interpolate_scalar_field(p_i, p_j, p_k, scalar_field, epsilon=1e-10): # implementing Inverse Distance Weighting (Shepard's method)
 
     # Origin of new RF primed: O' = [0,0,0] but O = [p_i, p_j, p_k] in not primed RF.
     u, v, w = p_i - np.floor(p_i), p_j - np.floor(p_j), p_k - np.floor(p_k)
@@ -384,6 +334,7 @@ def interpolate_scalar_field(p_i, p_j, p_k, scalar_field, epsilon=1e-10): # impl
             
             cum_sum += scalar_field[i][j][k]*np.exp(-distance**(3)/8)/ (distance + epsilon) ** 2
             cum_inv_dis += 1 / (distance + epsilon) ** 2 
+
             
     interpolated_scalar = cum_sum / cum_inv_dis
     return interpolated_scalar

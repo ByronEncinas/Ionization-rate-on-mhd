@@ -68,7 +68,7 @@ reduction_factor_at_s = []
 inv_reduction_factor_at_s = []
 normalized_bfield = []
 
-pocket, global_info = visualize_pockets(bfield, "_c1", plot=False) # this plots
+pocket, global_info = pocket_finder(bfield, "_c1", plot=False) # this plots
 index_pocket, field_pocket = pocket[0], pocket[1]
 
 global_max_index = global_info[0]

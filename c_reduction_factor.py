@@ -149,7 +149,7 @@ while cycle < max_cycles:
         """# Calculating Trajectory"""
 
         # We are looking into the two nearest critical points, so let's look at points were first derivative 
-        for time in timestep:
+        while True:
             try:
                     # print(count, lin_seg ,bf_mag)
                     # B Field at current position and save
@@ -195,7 +195,7 @@ while cycle < max_cycles:
     """# Obtained position along the field lines, now we find the pocket"""
 
     #index_peaks, global_info = pocket_finder(bfield) # this plots
-    pocket, global_info = visualize_pockets(bfield, cycle, plot=False) # this plots
+    pocket, global_info = pocket_finder(bfield, cycle, plot=False) # this plots
     index_pocket, field_pocket = pocket[0], pocket[1]
 
     # we can evaluate reduction factor if there are no pockets
@@ -218,7 +218,6 @@ while cycle < max_cycles:
 
     print("random index: ", p_r, "peak's index: ", index_pocket)
     
-
     """How to find index of Bl?"""
 
     # Bl it is definitely between two peaks, we need to verify is also inside a pocket

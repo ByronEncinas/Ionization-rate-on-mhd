@@ -118,7 +118,7 @@ else:
         
     # CONSTANT
     point_i, point_j, point_k = int(), int(), int()
-    TOTAL_TIME = 900000
+    TOTAL_TIME = 9000000
     TIMESTEP   = 0.05
     SNAPSHOTS  = int(TOTAL_TIME/TIMESTEP)
     DS         = 128
@@ -157,17 +157,19 @@ else:
 
         distance = []                                # acumulative pathdistances
         bfield = []                             # magnetic field at each s-distance
+        number_density=[]
 
         count = 0                                             # iterator count
 
         """# Calculating Trajectory"""
         # We are looking into the two nearest critical points, so let's look at points were first derivative 
-        for time in timestep:
+        while True:
             try:
                 # print(count, lin_seg ,bf_mag)
                 # B Field at current position and save
                 Bp_run = np.array(interpolate_vector_field(cur_pos[0], 
                                             cur_pos[1],  cur_pos[2], Bx, By, Bz))
+
                 bfield_s.append(Bp_run)
                 bf_mag = magnitude(Bp_run)
 
@@ -182,7 +184,7 @@ else:
                 break
 
             lin_seg +=  magnitude(cur_pos,  prev_pos) * scale_factor # centimeters
-            print(magnitude(cur_pos,  prev_pos) * scale_factor)
+            #print(magnitude(cur_pos,  prev_pos) * scale_factor)
             prev_pos =  cur_pos.copy()
 
             distance.append(lin_seg)
@@ -197,11 +199,12 @@ else:
 
     # this [1:] cut is because both lists contain the initial point
     f = max(left_distance)
+    
 
     distance = list(left_distance) + [f + d for d in right_distance[1:]]
     radius_vector = list(left_radius_vector) + right_radius_vector[1:]
     bfield        = list(left_bfield_magnitudes) + right_bfield_magnitudes[1:]
-
+    
     """ 
     plt.plot(distance, bfield, linewidth=2.0)
     plt.show() 
@@ -252,9 +255,11 @@ def PowerLaw(Eparam, E, power, const):
     """
     return const * (E / Eparam) ** (power)
 
-def ColumnDensity(sh, mu):
+def ColumnDensity(mu):
     """
     Compute column density for a given pitch angle and distance traveled.
+
+    Number Density is the amount of matter (in Nucleons) that a particle travels by in a trajectory
 
     Parameters:
     - sh (float): Final distance traveled (reachpoint of column density).
@@ -265,105 +270,45 @@ def ColumnDensity(sh, mu):
     """
 
     dColumnDensity = 0.0
-    index_sh = distance.index(sh)  # final distance will be highetst # Find index corresponding to the final distance
-    Bats = bfield[index_sh]  # Magnetic field strength at the stopping point
-    prev_sc = distance[0]
+    Bats = bfield[-1]  # Magnetic field strength at the stopping point
     ds = abs(distance[1] - distance[0]) # they are equally space (unito * delta)
-    protonMass = 1.6726219259e-24
 
-    for i, sc in enumerate(distance):
-
+    for i in range(len(distance)): # this 
+        
         gaspos = radius_vector[i]  # Position for s in structured grid
-        gasden = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0
-        numb_den = gasden+0*(1/protonMass)
+        numb_den = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0       
         Bsprime = bfield[i]
         
-        #print(f"gas density at: {sc} =>",gasden, " w/ N =>", numb_den)
-        
-        try:
-            bdash = Bsprime / Bats  # Ratio of magnetic field strengths
-            deno = 1 - bdash * (1 - mu**2)
-            if deno < 0:
-                return dColumnDensity
-            one_over = 1.0 / np.sqrt(deno)            # Reciprocal of the square root term
-            dColumnDensity += numb_den * ds * one_over   # Accumulate the contribution to column density
-        except ZeroDivisionError:
-            print("Error: Division by zero. Check values of B(s')/B(s) and \mu")
-            return dColumnDensity
-        
-        return dColumnDensity
+        bdash = Bsprime / Bats  # Ratio of magnetic field strengths
+        deno = 1 - bdash * (1 - mu**2)
+        if deno < 0:
+            dColumnDensity += numb_den * ds  
+            return numb_den, dColumnDensity
+        one_over = 1.0 / np.sqrt(deno)               # Reciprocal of the square root term
+        dColumnDensity += numb_den * ds * one_over   # Accumulate the contribution to column density
 
-def Energy(E, mu, cd, d=0.82): 
-    """
-    Compute new energy based on the given parameters.
+        #print(f"{i}: n(H2) => ", numb_den, "N:", dColumnDensity)
 
-    Parameters:
-    - Ei (float): Initial energy.
-    - mu (float): Cosine of the pitch angle (0 < pitch_angle < pi).
-    - s (float): Distance traveled.
-    - cd (float): Column density up to s
-    - d (float): Constant parameter (default value: 0.82).
-
-    Returns:
-    - float: New energy calculated based on the given parameters.
-    """
-    try:
-        # Calculate the new energy using the given formula
-        Ei = (E**(1 + d) + (1 + d) * Lstar * cd * Estar**(d))**(1 / (1 + d))
-
-    except Exception as e:
-        # Catch forbiden values in Ei expression
-        print("Error:", e)
-        exit()
-
-    return Ei
-
-def Jcurr(Ei, E, cd):
-    """
-    Calculate current J(E, mu, s) based on given parameters.
-
-    Parameters:
-    - Ei (float): Lower bound initial energy. E_exp
-    - E (float): Integration variable.
-    - mu (float): Pitch angle cosine.
-
-    Returns:
-    - list: J(E, mu, s) 
-    """
-    try:
-        # Calculate Jcurr using the PowerLaw function
-        Jcurr = PowerLaw(Estar, Ei, a, Jstar) * PowerLaw(Estar, Ei, -d, Lstar) / PowerLaw(Estar, E, -d, Lstar)
-        
-        JcurrIvlev = C*(E**0.1)/((E+500)**2.8) #PowerLaw(Estar, Ei, a, Jstar) * PowerLaw(Estar, Ei, -d, Lstar)
-
-    except Exception as e:
-        print(PowerLaw(Estar, Ei, a, Jstar), '+')
-        print(PowerLaw(Estar, Ei, -d, Lstar))
-        print(Estar, E, -d, Lstar)
-        print("Error:", e)
-        print("Jcurr() has issues")
-        exit()
-
-    return Jcurr, JcurrIvlev
+    return numb_den, dColumnDensity
 
 """ 
 Ionization Calculation
 
 - [x] Integrate over the trajectory to obtain column density
 - [x] Integrate over all posible energies E in \[1 MeV, 1GeV\]
-- [x] Integrate over all posible values of pitch angle d(cos(alpha_i)) with alpha_i in \[0, pi\]
+- [x] Integrate over all posible values of pitch angle d(cos(alpha_i)) with alpha_i in \[0, pi/2\]
 - [ ] Add all three CR populations
 """
 
-def Ionization(reverse, mirror=False):
+def Ionization(direction="forward", mirror=False):
     with open(f"b_output_data/ionization_data.txt", "w") as io_data: # save data for future analysis
 
         # precision of simulation depends on data characteristics (around precision 2500)
-        precision = 1000
+        precision = 300
 
-        pocket, global_info = visualize_pockets(bfield, 0, plot=False) # this plots
+        pocket, global_info = pocket_finder(bfield, 0, plot=False) # this plots
         index_pocket, field_pocket = pocket[0], pocket[1]
-        print(index_pocket)
+        #print(index_pocket)
 
         globalmax_index = global_info[0]
         globalmax_field = global_info[1]
@@ -374,21 +319,20 @@ def Ionization(reverse, mirror=False):
             return np.sqrt((1 - B_i / B_j) )        
 
         # 0.0 < pitch < np.pi/2
-        da = np.pi / (precision)
+        da = np.pi / (2*precision)
         ang = np.array([ da * j for j in range(int(precision)) ])
 
         match mirror:
             case True: # se up a list of \mu's for each pocket
-                da = np.pi / (precision)
+                da = np.pi / (2*precision)
                 ang = np.array([ da * j for j in range(int(precision)) ])
                 #mu = np.cos(ang)  
             case False: 
-                da = np.pi / (precision)
+                da = np.pi / (2*precision)
                 ang = np.array([ da * j for j in range(int(precision)) ])
-                #mu = np.cos(ang)
-            
+
         # Forward moving particles (-1 < \mu < \mu_h) where \mu_h is at the lowest peak 
-        ionization_pop = 0.0
+        ionization = 0.0
         
         # 1.60218e-6 ergs (1 MeV = 1.0e+6 eV)
         Ei = 1.0e+3 # eV
@@ -405,97 +349,83 @@ def Ionization(reverse, mirror=False):
         ColumnH2       = []
         LogIonization  = []
 
-        for ai in reversed(ang):   
+        for ai in ang[1:]:  
 
             mui = np.cos(ai)
-            
-            cd = 3.577442927981429e+19 #ColumnDensity(distance[globalmax_index], mui) # 0.000, np.inf #
 
-            if np.isnan(cd): # tests if cd = Nan
+            numbden, cd = ColumnDensity(mui) # 3.577442927981429e+19
+            #print(numbden, cd)
+
+            if np.isnan(cd) or cd == 0.0: # tests if cd = Nan
                 print("cd is Nan? ", np.isnan(cd)==True)
                 continue
             
-            Spectrum       = []
-            Spectrumi      = []
-            IvlevLaw       = []
+            SpectrumL       = []
+            SpectrumP      = []
             Evar = Ei
 
-            for k in range(precision):
+            for k in range(precision-1):
                 
                 Evar = Ei + k * dE
 
-                # E_exp = Ei^(1+d) = E^(1+d) + L_(1+d) N E_^d   
-                E_exp = Energy(Evar, mui, cd, d) # Ei(E)
+                # E_exp = Ei = (E**(1 + d) + (1 + d) * Lstar * cd * Estar**(d))**(1 / (1 + d))
+                E_exp = (Evar**(1 + d) + (1 + d) * Lstar * cd * Estar**(d))**(1 / (1 + d)) 
 
-                # Current for J_+(E, mu, s) # Jcurr(Ei, E, cd)
-                J, _ = Jcurr(E_exp, Evar, cd)
-                J_i  = PowerLaw(Estar, E_exp, a, Jstar)*PowerLaw(Estar, E_exp, -d, Lstar) / PowerLaw(Estar, Evar, -d, Lstar)
-                print(J, _,J_i)
+                # Current for J(E, mu, s)*L(E)
+                JplusLoss = PowerLaw(Estar, E_exp, a, Jstar) * PowerLaw(Estar, E_exp, -d, Lstar)
+                Jplus  = PowerLaw(Estar, E_exp, a, Jstar)*PowerLaw(Estar, E_exp, -d, Lstar) / PowerLaw(Estar, Evar, -d, Lstar)
+                                
+                # Current using model
+                SpectrumL.append(np.log10(JplusLoss))
+                SpectrumP.append(np.log10(Jplus))
                 
-                    # Current using model
-                Spectrum.append(np.log10(J))
-                Spectrumi.append(np.log10(J_i))
-                IvlevLaw.append(np.log10(_))
-                
-                #print("Ionization (s): ", ionization_pop, "related to energy (J):", Evar, "with angle(alpha):", ai) 
+                #print("Ionization (s): ", ionization, "related to energy (J):", Evar, "with angle(alpha):", ai) 
                 
                 try:
-                    print(1/epsilon, J, dE, np.sin(ai), da)
-                    #ionization_pop += (1/epsilon)*J*dE*np.sin(ai)*da
+                    #print(1/epsilon, J, dE, np.sin(ai), da)
+                    ionization += (1/epsilon)*JplusLoss*dE*np.sin(ai)*da
                 except Exception as e:
                     print(e)
                     print("J Spectrum() has issues")
-                io_data.write(f"{np.log10(ionization_pop)}, {cd}\n") 
 
-            ColumnH2.append(cd)
-            LogIonization.append(np.log10(ionization_pop)) # Ionization for that Column Density for that population
+                io_data.write(f"{np.log10(ionization)}, {cd}\n") 
+            ColumnH2.append(np.log(cd))
+            LogIonization.append(np.log10(ionization)) # Ionization for that Column Density for that population
         
-        print("Resulting Ionization: ", ionization_pop)       
+        print("Resulting Ionization: ", ionization)       
 
-    return (LogIonization, ColumnH2, logE, Spectrum, Spectrumi, IvlevLaw) 
-
-# Choose a test case for the streamline coordinate
+    return (LogIonization, ColumnH2, logE, SpectrumL, SpectrumP) 
 
 # Calculating different Populations
 
 # Forward moving particles (-1 < \mu < \mu_l) where \mu_h is at the lowest peak $\mu_l = \sqrt{1-B(s)/B_l}$
-forward_ionization = Ionization(reverse = False)
+logIonization, ColumnH, LogEnergies, SpectrumL, SpectrumP = Ionization()
 
 # Backward moving particles (-1 < \mu < \mu_h) where \mu_h is at the highest peak $\mu_h = \sqrt{1-B(s)/B_h}$
 #backward_ionization = Ionization(reverse = True)
 
-# such that s_h and s_l form a pocket
-
 # Mirrored particles (Union of consecutive \mu_l < \mu < \mu_h given by pockets)
 # mirrored_ionization = Ionization(reverse=False, mirror = True)
-
-logIonization = forward_ionization[0] # Current using model
-ColumnH       = forward_ionization[1] # 
-LogEnergies   = forward_ionization[2] # 
-Spectrum      = forward_ionization[3] # 
-Spectrumi     = forward_ionization[4] # 
-IvlevLaw      = forward_ionization[5] # 
 
 # Save data in files
 precision = len(logIonization)
 print(len(ColumnH))
-print(len(Spectrum))    # +1
+print(len(SpectrumL))    # +1
 
 da = np.pi / 2*(precision)
 ang = np.array([ da * j for j in range(int(precision)) ])
 
-if True:
+if False:
     # Create a 2x1 subplot grid
     fig, axs = plt.subplots(2, 1, figsize=(8, 12))
 
     # Scatter plot for Spectrum vs LogEnergies
     
-    axs[0].plot(LogEnergies, Spectrum, label='log_{10}(J(E) \ eV^-1 cm^-2 s^-1 sr^-1)', linestyle=':', color='red')
-    axs[0].plot(LogEnergies,Spectrumi, label='log_{10}(J_i(E_i) \ eV^-1 cm^-2 s^-1 sr^-1)', linestyle=':', color='blue')
-    axs[0].plot(LogEnergies, IvlevLaw, label='log_{10}(J(E) (Ivlev et al, 2015))', linestyle=':', color='grey')
+    axs[0].plot(LogEnergies, SpectrumL, label='$log_{10}(J(E) \ eV^-1 cm^-2 s^-1 sr^-1)$', linestyle=':', color='red')
+    axs[0].plot(LogEnergies,SpectrumP, label='log_{10}(J_i(E_i) \ eV^-1 cm^-2 s^-1 sr^-1)', linestyle=':', color='blue')
     #axs[1].set_yscale('log')
-    axs[0].set_ylabel('log_{10}(J(E) \ eV^-1 cm^-2 s^-1 sr^-1)')
-    axs[0].set_xlabel('Log_{10}(E \ eV)')
+    axs[0].set_ylabel('$log_{10}(J(E) \ eV^-1 cm^-2 s^-1 sr^-1)$')
+    axs[0].set_xlabel('$Log_{10}(E \ eV)$')
     axs[0].legend()
 
 
@@ -503,7 +433,7 @@ if True:
     #axs[0].plot(ColumnH, logIonization, label='$log_{10}(\zeta \ Forward Particles)$', linestyle='--', color='blue')
     axs[1].plot(ColumnH, logIonization, label='$log_{10}(\zeta \ Forward Particles)$', linestyle='--', color='blue')
     axs[1].set_ylabel('$log_{10}(\zeta \ s^-1)$')
-    axs[1].set_xlabel('$n(H_2) (N \ cm^-2)$')
+    axs[1].set_xlabel('$N(H_2) (N \ cm^{-2})$')
     axs[1].legend()
 
     # Adjust layout
