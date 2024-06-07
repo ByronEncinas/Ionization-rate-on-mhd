@@ -138,4 +138,4 @@ if True:
     plt.savefig("reductionf_at_s.png")
 
     # Display the plot
-    plt.show()
+    #plt.show()
