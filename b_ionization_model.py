@@ -130,7 +130,7 @@ else:
     point_j = 81.482
     point_k = 35.057
 
-    if False: # random point generator
+    if True: # random point generator
         point_i = random.uniform(MARGIN, DS-MARGIN)
         point_j = random.uniform(MARGIN, DS-MARGIN)
         point_k = random.uniform(MARGIN, DS-MARGIN)
@@ -163,7 +163,7 @@ else:
 
         """# Calculating Trajectory"""
         # We are looking into the two nearest critical points, so let's look at points were first derivative 
-        while True:
+        while all(ingrid(prev_pos[0], prev_pos[1], prev_pos[2])):
             try:
                 # print(count, lin_seg ,bf_mag)
                 # B Field at current position and save
@@ -185,7 +185,7 @@ else:
 
             lin_seg +=  magnitude(cur_pos,  prev_pos) * scale_factor # centimeters
             #print(magnitude(cur_pos,  prev_pos) * scale_factor)
-            prev_pos =  cur_pos.copy()
+            prev_pos = cur_pos.copy()
 
             distance.append(lin_seg)
             bfield.append(bf_mag)
@@ -399,21 +399,13 @@ def Ionization(direction="forward", mirror=False):
 # Calculating different Populations
 
 # Forward moving particles (-1 < \mu < \mu_l) where \mu_h is at the lowest peak $\mu_l = \sqrt{1-B(s)/B_l}$
-logIonization, ColumnH, LogEnergies, SpectrumL, SpectrumP = Ionization()
+#logIonization, ColumnH, LogEnergies, SpectrumL, SpectrumP = Ionization()
 
 # Backward moving particles (-1 < \mu < \mu_h) where \mu_h is at the highest peak $\mu_h = \sqrt{1-B(s)/B_h}$
 #backward_ionization = Ionization(reverse = True)
 
 # Mirrored particles (Union of consecutive \mu_l < \mu < \mu_h given by pockets)
 # mirrored_ionization = Ionization(reverse=False, mirror = True)
-
-# Save data in files
-precision = len(logIonization)
-print(len(ColumnH))
-print(len(SpectrumL))    # +1
-
-da = np.pi / 2*(precision)
-ang = np.array([ da * j for j in range(int(precision)) ])
 
 if False:
     # Create a 2x1 subplot grid

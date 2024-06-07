@@ -126,7 +126,7 @@ while cycle < max_cycles:
     def trajectory(point_i, point_j, point_k, direction):    
 
         prev_pos = np.array([point_i, point_j, point_k])
-        forward_cur_pos = np.array([point_i, point_j, point_k])   # initial position
+        cur_pos = np.array([point_i, point_j, point_k])   # initial position
 
         timestep = np.linspace(0, TOTAL_TIME, SNAPSHOTS + 1)  # start time, final_time, number of snapshots
         delta = timestep[1] - timestep[0]                     # delta timestep
@@ -134,9 +134,9 @@ while cycle < max_cycles:
         if direction == -1:
             delta *= -1
 
-        radius_vector = [forward_cur_pos.tolist()]                      # all trajectory points
+        radius_vector = [cur_pos.tolist()]                      # all trajectory points
 
-        bfield_s = [interpolate_vector_field( forward_cur_pos[0],  forward_cur_pos[1],  forward_cur_pos[2], Bx, By, Bz)]  # all trajectory points
+        bfield_s = [interpolate_vector_field( cur_pos[0],  cur_pos[1],  cur_pos[2], Bx, By, Bz)]  # all trajectory points
 
         lin_seg = 0.0                                         #distance of path traveled (s)
         bf_mag =  0.0                                         # magnetic field at s-distance
@@ -149,26 +149,26 @@ while cycle < max_cycles:
         """# Calculating Trajectory"""
 
         # We are looking into the two nearest critical points, so let's look at points were first derivative 
-        while True:
+        while all(ingrid(prev_pos[0], prev_pos[1], prev_pos[2])):
             try:
                     # print(count, lin_seg ,bf_mag)
                     # B Field at current position and save
-                    Bp_run = np.array(interpolate_vector_field(forward_cur_pos[0], 
-                                        forward_cur_pos[1],  forward_cur_pos[2], Bx, By, Bz))
+                    Bp_run = np.array(interpolate_vector_field(cur_pos[0], 
+                                        cur_pos[1],  cur_pos[2], Bx, By, Bz))
                     bfield_s.append(Bp_run)
                     bf_mag = magnitude(Bp_run)
 
                     # unit vector in field direction
                     unito = Bp_run/bf_mag
-                    forward_cur_pos += unito*delta
+                    cur_pos += unito*delta
                         
-                    radius_vector.append(forward_cur_pos.tolist())                        
+                    radius_vector.append(cur_pos.tolist())                        
             except:
                 print("Particle got out of the Grid")
                 break
 
-            lin_seg +=  magnitude(forward_cur_pos,  prev_pos) * scale_factor # centimeters
-            prev_pos =  forward_cur_pos.copy()
+            lin_seg +=  magnitude(cur_pos,  prev_pos) * scale_factor # centimeters
+            prev_pos =  cur_pos.copy()
 
             distance.append(lin_seg)
             bfield.append(bf_mag)
@@ -186,7 +186,7 @@ while cycle < max_cycles:
     bfield        = list(reversed(left_bfield_magnitudes)) + right_bfield_magnitudes[1:]
 
     #print()
-    #print(f"Initial Position: {forward_cur_pos}, Timestep: {delta}\n")
+    #print(f"Initial Position: {cur_pos}, Timestep: {delta}\n")
     #print("Integration: from ", radius_vector[0], "--> to ", radius_vector[-1])
 
     #print("Min, Max of B in trayectory: ", min_bp, max_bp)
@@ -323,7 +323,7 @@ plt.tight_layout()
 
 # Save the figure
 #plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}"+name+".png")
-plt.savefig(f"histogramdata={len(reduction_factor)}bins={bins}.png")
+plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}={sys.argv[-1]}.png")
 
 # Show the plot
 #plt.show()
