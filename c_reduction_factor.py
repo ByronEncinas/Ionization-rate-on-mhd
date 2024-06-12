@@ -1,5 +1,6 @@
 from z_library import *
-from collections import Counter
+from collections import Counter, defaultdict
+import seaborn as sns
 import json
 
 """  
@@ -47,6 +48,8 @@ if True:
 
     # Velocity Dispersion
     vel_disp = np.array(np.load("input_data/velocity_dispersion.npy", mmap_mode='r'))
+
+#print(np.mean(gas_den)) ~ 22.660904340815943 as number density
 
 if True:
     """  
@@ -109,19 +112,22 @@ else:
     max_cycles = 100
     print("max cycles:", max_cycles)
 
+reduction_factor_at_gas_density = defaultdict()
+
 while cycle < max_cycles:
+    
     # this points contains several pocket, and it vanishes at the extremes.
     """ 
     point_i = 47.657
     point_j = 81.482
     point_k = 35.057
-     """
+    """
     if True:
         point_i = random.uniform(MARGIN, DS-MARGIN)
         point_j = random.uniform(MARGIN, DS-MARGIN)
         point_k = random.uniform(MARGIN, DS-MARGIN)
 
-    # random point has been selected, now we gotta follow field lines
+    # random point has been selected, now we gotta follow field lines    
 
     def trajectory(point_i, point_j, point_k, direction):    
 
@@ -260,8 +266,12 @@ while cycle < max_cycles:
     except:
         # this statement won't reach cycle += 1 so the cycle will continue again.
         print("Bl: ", B_l, " B_r/B_l =", B_r/B_l, "> 1 so CRs are not affected => R = 1") 
-        
-    """ 
+
+    # Now we pair reduction factors at one position with the gas density there.
+    gas_density_at_random = interpolate_scalar_field(point_i,point_j,point_k, gas_den)
+    reduction_factor_at_gas_density[R] = gas_density_at_random # Key: 1/R => Value: Ng (gas density)
+ 
+    """
     bs: where bs is the field magnitude at the random point chosen 
     bl: magnetic at position s of the trajectory
     """
@@ -276,18 +286,14 @@ file_path = 'random_distributed_reduction_factor.json'
 with open(file_path, 'w') as json_file:
     json.dump(reduction_factor, json_file)
 
-print(reduction_factor)
 """# Graphs"""
-
-# shape of field lines 
-print("Plot B(s)")
 
 #plot_trajectory_versus_magnitude(distance, bfield, ["B Field Density in Path", "B-Magnitude", "s-coordinate"])
 
 # Here we plot the histogram for given reduction factor
 import matplotlib.pyplot as plt
 
-if len(sys.argv) >= 2:
+if len(sys.argv) <= 2:
     bins = int(sys.argv[2])
     print("bins:", bins)
 else:
@@ -297,27 +303,33 @@ else:
 red_fact_count = Counter(reduction_factor)
 inv_red_fact_count = Counter(reduction_factor)
 
-print(red_fact_count,"\n")
-print(inv_red_fact_count)
-
 inverse_reduction_factor = [1/reduction_factor[i] for i in range(len(reduction_factor))]
+key, value = zip(*reduction_factor_at_gas_density.items())
+
+# try plt.stairs(*np.histogram(inverse_reduction_factor, 50), fill=True, color='skyblue')
 
 # Create a figure and axes objects
-fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+fig, axs = plt.subplots(1, 3, figsize=(10, 5))
 
 # Plot histograms on the respective axes
 axs[0].hist(reduction_factor, bins=bins, color='skyblue', edgecolor='black')
-axs[1].hist(inverse_reduction_factor, bins=bins, color='skyblue', edgecolor='black')
-
-# Adding labels and title for each subplot
+axs[0].set_yscale('log')
 axs[0].set_title('Histogram of Reduction Factor (R)')
 axs[0].set_xlabel('Bins')
 axs[0].set_ylabel('Frequency')
 
+axs[1].hist(inverse_reduction_factor, bins=bins, color='skyblue', edgecolor='black')
+axs[1].set_yscale('log')
 axs[1].set_title('Histogram of Inverse Reduction Factor (1/R)')
 axs[1].set_xlabel('Bins')
 axs[1].set_ylabel('Frequency')
 
+plt.style.use('_mpl-gallery-nogrid')
+
+axs[2].hist2d(key, value)
+axs[2].set_title('Histogram of Reduction Factor (1/R)')
+axs[2].set_xlabel('Reduction Factor (R)')
+axs[2].set_ylabel('Gas Number Density ($N_g$)')
 # Adjust layout
 plt.tight_layout()
 
@@ -327,3 +339,4 @@ plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}={sy
 
 # Show the plot
 #plt.show()
+plt.show()

@@ -174,7 +174,7 @@ CourantNumber = Bpsn[0]*delta/scale_factor
 #with open(f"b_output_data/{starting_pos}_file/initpos_{starting_pos}_iter.txt", "w") as run_data:
 with open(f"a_output_data/critical_points.txt", "w") as run_data: #tests
 
-        for time in timestep:
+        while True:
             try:
                 # B Field at current position and save
                 Bp_run = np.array(interpolate_vector_field(run_cur_pos[0], run_cur_pos[1], run_cur_pos[2], Bx, By, Bz))
@@ -196,8 +196,6 @@ with open(f"a_output_data/critical_points.txt", "w") as run_data: #tests
                 follown.append(gridpos.tolist())
                            
                 run_data.write(f"{count}, {lin_seg_n}, {xpos}, {ypos}, {zpos},{bf_mag},{Bp_run[0]},{Bp_run[1]},{Bp_run[2]},{run_cur_pos[0]},{run_cur_pos[1]},{run_cur_pos[2]}\n") 
-                CourantNumber = Bp_run*delta/scale_factor
-                print(CourantNumber)
             except:
                 print("Particle got out of the Grid")
                 break
@@ -207,9 +205,6 @@ with open(f"a_output_data/critical_points.txt", "w") as run_data: #tests
             #print(magnitude(gridpos, prev_gridpos),magnitude(run_cur_pos, run_prev_pos)*scale_factor)
             run_prev_pos = run_cur_pos.copy()
             prev_gridpos = gridpos.copy()
-
-            line_segment_g.append(lin_seg_g)
-            bfield_magnitud_g.append(bf_mag)
 
             line_segment_n.append(lin_seg_n)
             bfield_magnitud_n.append(bf_mag)
@@ -238,7 +233,9 @@ print(scale_factor)
 
 np.linspace(0, TOTAL_TIME, SNAPSHOTS + 1)
 
-if False:
+pocket_finder(bfield_magnitud_n, plot=True)
+
+if True:
   try:
     plot_trajectory_versus_magnitude(line_segment_n,bfield_magnitud_n, ["B Field Density in Path", "B-Magnitude", "s-coordinate"])
     plot_trajectory_versus_magnitude(line_segment_g,bfield_magnitud_n, ["B Field Density in Path", "B-Magnitude", "s-coordinate"])

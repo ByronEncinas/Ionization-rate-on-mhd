@@ -43,9 +43,9 @@ def pocket_finder(bmag, cycle=0, plot =False):
         # Create a figure and axes for the subplot layout
         fig, axs = plt.subplots(1, 1, figsize=(8, 6))
 
-        # Plot the first set of data on the first subplot
         axs.plot(bmag)
         axs.plot(indexes,peaks, "x", color="green")
+        axs.plot(indexes,peaks, ":", color="green")
         axs.plot(index_global_max, upline, "x", color="black")
         axs.plot(np.ones_like(bmag)*baseline, "--", color="gray")
         axs.set_xlabel("Index")

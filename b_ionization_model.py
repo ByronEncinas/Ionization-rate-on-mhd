@@ -122,15 +122,19 @@ else:
     TIMESTEP   = 0.05
     SNAPSHOTS  = int(TOTAL_TIME/TIMESTEP)
     DS         = 128
-    MARGIN     = 34
+    MARGIN     = 50
 
     # this points contains several pocket, and it vanishes at the extremes.
+    
+    point_i = 121.4
+    point_j = 109.1
+    point_k = 13.6
 
     point_i = 47.657
     point_j = 81.482
     point_k = 35.057
 
-    if True: # random point generator
+    if False: # random point generator
         point_i = random.uniform(MARGIN, DS-MARGIN)
         point_j = random.uniform(MARGIN, DS-MARGIN)
         point_k = random.uniform(MARGIN, DS-MARGIN)
@@ -306,7 +310,7 @@ def Ionization(direction="forward", mirror=False):
         # precision of simulation depends on data characteristics (around precision 2500)
         precision = 300
 
-        pocket, global_info = pocket_finder(bfield, 0, plot=False) # this plots
+        pocket, global_info = pocket_finder(bfield, 0, plot=True) # this plots
         index_pocket, field_pocket = pocket[0], pocket[1]
         #print(index_pocket)
 
@@ -396,6 +400,8 @@ def Ionization(direction="forward", mirror=False):
 
     return (LogIonization, ColumnH2, logE, SpectrumL, SpectrumP) 
 
+pocket_finder(bfield, 0, plot=True) # this plots
+
 # Calculating different Populations
 
 # Forward moving particles (-1 < \mu < \mu_l) where \mu_h is at the lowest peak $\mu_l = \sqrt{1-B(s)/B_l}$
@@ -420,6 +426,7 @@ if False:
     axs[0].set_xlabel('$Log_{10}(E \ eV)$')
     axs[0].legend()
 
+    #column_density = np.linspace(10e+19, 10e+27, len(logIonization))
 
     # Scatter plot for Ionization vs Column H
     #axs[0].plot(ColumnH, logIonization, label='$log_{10}(\zeta \ Forward Particles)$', linestyle='--', color='blue')
