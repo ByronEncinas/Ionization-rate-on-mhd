@@ -344,4 +344,4 @@ plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}={sy
 
 # Show the plot
 #plt.show()
-plt.show()
+#plt.show()
