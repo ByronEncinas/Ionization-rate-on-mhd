@@ -89,7 +89,6 @@ y =   y[0:DS, 0:DS, 0:DS]
 z =   z[0:DS, 0:DS, 0:DS]
 
 print()
-print("Size of array matrix: {Bx.shape[0]}x{By.shape[0]}x{Bz.shape[0]}\n")
 
 reduction_factor = []
 
@@ -284,6 +283,13 @@ file_path = 'random_distributed_reduction_factor.json'
 # Write the list data to a JSON file
 with open(file_path, 'w') as json_file:
     json.dump(reduction_factor, json_file)
+
+# Specify the file path
+file_path = 'random_distributed_gas_density.json'
+
+# Write the list data to a JSON file
+with open(file_path, 'w') as json_file:
+    json.dump(list(reduction_factor_at_gas_density.values()), json_file)
 
 """# Graphs"""
 
