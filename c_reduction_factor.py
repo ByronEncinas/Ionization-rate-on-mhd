@@ -309,12 +309,12 @@ red_fact_count = Counter(reduction_factor)
 inv_red_fact_count = Counter(reduction_factor)
 
 inverse_reduction_factor = [1/reduction_factor[i] for i in range(len(reduction_factor))]
-key, value = zip(*reduction_factor_at_gas_density.items())
+gas_density, reduction_r = zip(*reduction_factor_at_gas_density.items())
 
 # try plt.stairs(*np.histogram(inverse_reduction_factor, 50), fill=True, color='skyblue')
 
 # Create a figure and axes objects
-fig, axs = plt.subplots(1, 3, figsize=(10, 5))
+fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
 # Plot histograms on the respective axes
 axs[0].hist(reduction_factor, bins=bins, color='skyblue', edgecolor='black')
@@ -329,12 +329,6 @@ axs[1].set_title('Histogram of Inverse Reduction Factor (1/R)')
 axs[1].set_xlabel('Bins')
 axs[1].set_ylabel('Frequency')
 
-plt.style.use('_mpl-gallery-nogrid')
-
-axs[2].hist2d(key, value)
-axs[2].set_title('Histogram of Reduction Factor (1/R)')
-axs[2].set_xlabel('Reduction Factor (R)')
-axs[2].set_ylabel('Gas Number Density ($N_g$)')
 # Adjust layout
 plt.tight_layout()
 
@@ -343,5 +337,4 @@ plt.tight_layout()
 plt.savefig(f"c_output_data/histogramdata={len(reduction_factor)}bins={bins}={sys.argv[-1]}.png")
 
 # Show the plot
-#plt.show()
 #plt.show()
