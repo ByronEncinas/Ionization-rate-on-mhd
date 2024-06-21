@@ -1,19 +1,20 @@
 # folders
-__py*
 a_output*
 b_output*
 c_output*
+d_input_data*
 input_data
-venv
-.vscode
 
+# virtual env/bash scripts
 b_submit.sh
 c_submit.sh
 jakar-venv*
+venv
+.vscode
+__py*
 
 # png
 *.png
-*.json
 
 #executables
 *.c
@@ -21,3 +22,8 @@ runner.py
 setup.py
 spectrum.py
 test.py
+
+# data files
+*.json
+c_field_lines.txt
+

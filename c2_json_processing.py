@@ -50,26 +50,25 @@ print(len(inverse_reduction_factor))
 # Create a figure and axes objects
 fig, axs = plt.subplots(1, 2, figsize=(9, 3))
 
-# Plot histograms on the respective axes
-plt.stairs(*np.histogram(inverse_reduction_factor, 50), fill=True, color='skyblue')
-
 axs[0].hist(reduction_factor, bins=bins, color='skyblue')
 axs[0].set_yscale('log')
 axs[0].set_title('Histogram of Reduction Factor (R)')
-axs[0].set_xlabel('Bins')
-axs[0].set_ylabel('$R$')
+axs[0].set_ylabel('Bins')
+axs[0].set_xlabel('$R$')
+
+control = np.ones_like(reduction_factor)
 
 axs[1].hist(inverse_reduction_factor, bins=bins, color='skyblue')
 axs[1].set_yscale('log')
 axs[1].set_title('Histogram of Reduction Factor ($1/R$)')
-axs[1].set_xlabel('Bins')
-axs[1].set_ylabel('$log_{10}(1/R)$')
+axs[1].set_ylabel('Bins')
+axs[1].set_xlabel('$log_{10}(1/R)$')
 
 # Adjust layout
 plt.tight_layout()
 
 # Save the figure
-plt.savefig(f"c_output_data/test_py_histogramdata={len(reduction_factor)}bins={bins}.png")
+plt.savefig(f"c_output_data/json_processing_histogramdata={len(reduction_factor)}bins={bins}.png")
 
 plt.show()
 
@@ -112,7 +111,7 @@ axs.plot(x, median, color='dimgray', linestyle='--', label=f'Overall median ({ov
 # Add legend
 axs.legend()
 
-plt.savefig(f"c_output_data/test_py_.png")
+plt.savefig(f"c_output_data/json_processing_mean_median.png")
 
 plt.show()
 

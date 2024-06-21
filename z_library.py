@@ -6,6 +6,40 @@ import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 
 
+""" Process Lines from File into Lists """
+
+def process_line(line):
+    """
+    Process a line of data containing information about a trajectory.
+
+    Args:
+        line (str): Input line containing comma-separated values.
+
+    Returns:
+        dict or None: A dictionary containing processed data if the line is valid, otherwise None.
+    """
+    parts = line.split(',')
+    if len(parts) > 1:
+        iteration = int(parts[0])
+        traj_distance = float(parts[1])
+        initial_position = [float(parts[2:5][0]), float(parts[2:5][1]), float(parts[2:5][2])]
+        field_magnitude = float(parts[5])
+        field_vector = [float(parts[6:9][0]), float(parts[6:9][1]), float(parts[6:9][2])]
+        posit_index = [float(parts[9:][0]), float(parts[9:][1]), float(parts[9:][2])]
+
+        data_dict = {
+            'iteration': int(iteration),
+            'trajectory (s)': traj_distance,
+            'Initial Position (r0)': initial_position,
+            'field magnitude': field_magnitude,
+            'field vector': field_vector,
+            'indexes': posit_index
+        }
+
+        return data_dict
+    else:
+        return None
+
 """ b_ionization_model Methods """
 """ c_reduction_factor Methods """
 

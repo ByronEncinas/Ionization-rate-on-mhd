@@ -17,7 +17,10 @@ n0 = 150 #cm−3 and
 k  = 0.5 # –0.7
 
 d = 0.82
-a = 0.1
+a = 0.1 # spectral index either 0.1 from Low Model, or \in [0.5, 2.0] according to free streaming analytical solution.
+
+# mean energy lost per ionization event
+epsilon = 0.028837732137317718 #eV # 2.1 #
 
 # Luminosity per unit volume for cosmic rays (eV cm^2)
 Lstar = 1.4e-14
@@ -34,32 +37,6 @@ Jstar = 2.4e+15*(1.0e+6)**(0.1)/(Enot**2.8)
 Estar = 1.0e+6
 Epion = 280e+6
 
-
-energy = np.array([1.0e+2*(10)**(14*k/size) for k in range(size)])  # Energy values from 1 to 10^15
-logenergy = np.log10(energy)                                        # log10(Energy) values from 0 to 15
-column_density = np.array([1.0e+19*(10)**(8*k/size) for k in range(size)])
-
-""" 
-Range Function: Projected distance that a particle might travel due to continuos energy losses 
-
-R(E) = \int_0^E dE'/L(E')
-
-we hold L(E) = L* (E/E*)^(-d) for E* = 10^5 eV 
-
-We calculate this integral for every value of E corresponding with the the penetrating power into the cloud.
-
-Once obtained R(E) I can compare it with N(E,E0) via the relation N = R(E)-R(E0) 
-
-Such that for consecutive values of the Column density. R(E0,E) = (Ni+1 - Ni)/0 which is a constant asociated with an energy.
-"""
-
-print("Extremes of Energy ", energy[0], energy[-1]) 
-from scipy import integrate
-f = lambda E: (Lstar*(E/Estar)**(-d))**(-1)
-RangeFunction = []
-for upperbound_E in energy:
-    sol = integrate.quad(f, 0.1, upperbound_E)
-    RangeFunction.append(np.log10(sol[0]))
 
 """ Ionzation: Measure of energy/charge deposited from a charged particle in a medium per unit time """
 
@@ -80,8 +57,6 @@ integrand_jl = {}
 proton_spectrum = 0.0
 ism_spectrum = 0.0
 zeta_Ni  = 0.0
-DeltaE = 0.0
-dK = 0.0
 
 log_proton_spectrum = lambda E: np.log10(C) + 0.1*np.log10(E) - 2.8*np.log10(Enot + E) # J_p as in (Ivlev, 2015), Padovani et al equation (1)
 proton_spectrum = lambda E: C*E**0.1/(Enot + E)**2.8
@@ -106,14 +81,14 @@ for Ni in column_density:
         
         log_jp = proton_ism_spectrum[-1] + log_lossEi[-1] - log_lossE[-1]   # J_+ as in Silsbee, 2018 equation  (11)
         forward_spectrum.append(log_jp)
-        
-
     break
 
 mu = np.array([k/size for k in range(size)])
 integtrate_energies = np.array([k*(1.0e+12)/size for k in range(size)])
 print(len(integtrate_energies), len(energy))
 for i, Ni in enumerate(column_density): # will go from 3,4,5,6--- almost in integers#
+
+    # integrate with mui here <==
 
     integrand_jl[Ni] = []
     
@@ -157,24 +132,58 @@ for i,Ni in enumerate(column_density):
     lz = sum( [cj*(np.log10(Ni))**j for j, cj in enumerate(model_L)] )
     logz.append(lz)
 
-    difflogfit = (0.0)
-
-
 
 print("Extremes of zeta(N) ",logz[0], logz[-1])
 
 logzetafit = np.array(logz)
 svnteen = np.ones_like(column_density)*(-17)
 
+
+
 """  
 PLotting 
 
 """
+del a
+
+s_of_m = ["#F4A6D7", "#D10056", "#7D2248"]
+
 fig, axs = plt.subplots(2, 2, figsize=(10,10))  # Create a 2x2 grid of subplots
+
+""" 
+Free Streaming Cosmic Rays, Analytical Expression (Silsbee & Ivlev, 2019)
+"""
+
+from scipy import integrate
+
+If = {
+    "a=0.4": 5.14672,
+    "a=0.5": 3.71169,
+    "a=0.7": 2.48371
+    }
+
+Nof = Estar/((1+d)*Lstar)
+epsilon = 1.0e-9
+index = 0
+for b, I in If.items():
+    
+    free_streaming_ion = []
+    fs_ionization = 0.0
+    
+
+    for Ni in column_density:
+        
+        a = float(b.split("=")[1])
+        gammaf = (a+d-1)/(1+d)
+        fs_ionization = (1/epsilon)* (1+d) / (a+2*d) * Jstar * Lstar * Estar * (Ni/Nof) ** (-gammaf) * If[b]
+        free_streaming_ion.append(np.log(fs_ionization))
+        
+    axs[0,0].plot(column_density, free_streaming_ion, label=f'$log_{10}(\zeta_f(N, a={a}))$', linestyle="--", color=s_of_m[index])
+    index += 1
 
 # Plot Ionization vs Column Density (Second plot)
 axs[0,0].plot(column_density, logzetafit, label='$log_{10}(\zeta) \, (\mathrm{Padovani \, et \, al})$', linestyle="--", color="grey")
-axs[0,0].plot(column_density, log_zeta, label='$log_{10}(\zeta) = \int j_i (E_i) L(E_i) dE$', linestyle="-", color="black")
+axs[0,0].plot(column_density, log_zeta, label='$log_{10}(\zeta_{\int dE})$', linestyle="-", color="black")
 axs[0,0].plot(column_density, svnteen, label='$\zeta = 10^{-17}$', linestyle="--", color="skyblue")
 axs[0,0].set_xscale('log')
 axs[0,0].set_title('Ionization vs Column Density')
@@ -189,8 +198,8 @@ mid = len(column_density)//2
 axs[0,1].plot(energy, proton_local_spectrum, label='$log_{10}(j_p(E)), (Ivlev, 2015)$',linestyle="--", color="dimgrey")
 axs[0,1].plot(energy, low_energy_proton_ism_spectrum, label='$log_{10}(j_i(E)), (Silsbee, 2018)$',linestyle=":", color="red")
 axs[0,1].plot(energy, forward_spectrum, label='$log_{10}(j_+)$',linestyle="--", color="blue")
-axs[0,1].plot(energy, np.log10(integrand_jl[column_density[-1]]), label='$log_{10}(\partial_{\mu}\partial_E \zeta(NN=10^{27},\mu))$',linestyle=":", color="m")
-axs[0,1].plot(energy, np.log10(integrand_jl[column_density[0]]), label='$log_{10}(\partial_{\mu}\partial_E \zeta(NN=10^{19},\mu))$',linestyle=":", color="c")
+axs[0,1].plot(energy, np.log10(integrand_jl[column_density[-1]]), label='$log_{10}(\partial_{\mu}\partial_E \zeta(N=10^{27},\mu))$',linestyle=":", color="m")
+axs[0,1].plot(energy, np.log10(integrand_jl[column_density[0]]), label='$log_{10}(\partial_{\mu}\partial_E \zeta(N=10^{19},\mu))$',linestyle=":", color="c")
 axs[0,1].plot(energy, np.log10(integrand_jl[column_density[mid]]), label='$log_{10}(\partial_{\mu}\partial_E \zeta(N=10^{22},\mu))$',linestyle=":", color="y")
 axs[0,1].scatter(energy, proton_local_spectrum, marker="|",s=5, color="dimgrey")
 axs[0,1].scatter(energy, low_energy_proton_ism_spectrum, marker="|",s=5, color="red")
@@ -236,4 +245,5 @@ axs[1, 1].grid(True)
 
 fig.tight_layout(pad=2.0)
 plt.savefig("b_output_data/Mosaic.png")
+
 #plt.show()
