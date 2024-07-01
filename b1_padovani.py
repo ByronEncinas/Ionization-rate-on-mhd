@@ -20,7 +20,7 @@ d = 0.82
 a = 0.1 # spectral index either 0.1 from Low Model, or \in [0.5, 2.0] according to free streaming analytical solution.
 
 # mean energy lost per ionization event
-epsilon = 0.028837732137317718 #eV # 2.1 #
+epsilon = 35.14620437477293
 
 # Luminosity per unit volume for cosmic rays (eV cm^2)
 Lstar = 1.4e-14
@@ -46,11 +46,11 @@ logenergy = np.log10(energy)                                        # log10(Ener
 column_density = np.array([1.0e+19*(10)**(8*k/size) for k in range(size)])
 
 # for one value of \mu only
-log_zeta = []
+log_forward_ion = []
 log_lossE = []
 log_lossEi = []
 proton_local_spectrum = []
-proton_ism_spectrum = []
+log_proton_ism_spectrum = []
 low_energy_proton_ism_spectrum = []
 forward_spectrum = []
 integrand_jl = {}
@@ -63,54 +63,35 @@ proton_spectrum = lambda E: C*E**0.1/(Enot + E)**2.8
 log_ism_spectrum = lambda x: np.log10(Jstar) + a*(np.log10(x) - np.log10(Estar))
 log_loss_function = lambda z: np.log10(Lstar) - d*(np.log10(z) - np.log10(Estar) )
 
-for Ni in column_density:
-    for k, logE in enumerate(logenergy): # will go from 3,4,5,6--- almost in integers#
+ism_spectrum = lambda x: Jstar*(x/Estar)**a
+loss_function = lambda z: Lstar*(Estar/z)**d
 
-        Ei = (10**logE**(1 + d) + (1 + d) * Lstar* Estar**(d)* Ni)**(1 / (1 + d)) # E_i(E, N)
-        
-        proton_local_spectrum.append(log_proton_spectrum(10**logE))         # J_p as in Padovani et al equation (1)
-                                                                            # Padovani & Ivlev spectrum for ism medium at
-        proton_ism_spectrum.append(log_ism_spectrum(Ei))                    # J_i(E_i) as in Silsbee, 2018 equation  (17)
-                                                                            # spectrum associated with a certain column density (and hence energy Ei)
-                                                                            # High Column Densitites reduce the spectrum in the cloud
-        low_energy_proton_ism_spectrum.append(log_ism_spectrum(x=10**logE)) # J_i(E) as in Silsbee, 2018 equation  (17)
-
-        log_lossE.append(log_loss_function(10**logE))                       # ==> L(E)
-        log_lossEi.append(log_loss_function(Ei))                            # ==> L(Ei) Loss function inside cloud for Entrance energy (Ei)
-                                                                            # dependent on traversed energy to reach column density
-        
-        log_jp = proton_ism_spectrum[-1] + log_lossEi[-1] - log_lossE[-1]   # J_+ as in Silsbee, 2018 equation  (11)
-        forward_spectrum.append(log_jp)
-    break
-
-mu = np.array([k/size for k in range(size)])
-integtrate_energies = np.array([k*(1.0e+12)/size for k in range(size)])
-print(len(integtrate_energies), len(energy))
 for i, Ni in enumerate(column_density): # will go from 3,4,5,6--- almost in integers#
 
-    # integrate with mui here <==
+    jl_dE = 0.0
+    for k, E in enumerate(energy): # will go from 3,4,5,6--- almost in integers#
 
-    integrand_jl[Ni] = []
-    
-    for k, logE in enumerate(logenergy): # will go from 3,4,5,6--- almost in integers#
+        if Ni == column_density[-1]:
+            proton_local_spectrum.append(log_proton_spectrum(E))         # J_p as in Padovani et al equation (1)
+            low_energy_proton_ism_spectrum.append(log_ism_spectrum(E)) # J_i(E) as in Silsbee, 2018 equation  (17)
+            log_proton_ism_spectrum.append(log_ism_spectrum(Ei))                    # J_i(E_i) as in Silsbee, 2018 equation  (17)
+            log_lossE.append(log_loss_function(E))                       # ==> L(E)
+            log_lossEi.append(log_loss_function(Ei))                            # ==> L(Ei) Loss function inside cloud for Entrance energy (Ei)
+            log_jp = log_proton_ism_spectrum[-1] + log_lossEi[-1] - log_lossE[-1]   # J_+ as in Silsbee, 2018 equation  (11)
+            forward_spectrum.append(log_jp)
 
-        Ei = (10**logE**(1 + d) + (1 + d) * Lstar* Estar**(d)* Ni)**(1 / (1 + d)) # E_i(E, N)
+        Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* Ni)**(1 / (1 + d)) # E_i(E, N)
+
+        isms = ism_spectrum(Ei)            # log_10(j_i(E_i))
+        llei = loss_function(Ei)           # log_10(L(E_i))
+        jl_dE += isms*llei*diff_energy[k] # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
         
-        isms = log_ism_spectrum(Ei)
-        llei = log_loss_function(Ei)
-        jl = 10**isms*10**llei*diff_energy[k]
-        integrand_jl[Ni].append(jl)    
+    zeta_Ni = jl_dE/epsilon/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
+    
+    log_forward_ion.append(np.log10(zeta_Ni))
 
-    zeta_Ni = sum(integrand_jl[Ni][j]*diff_energy[j] for j in range(len(integrand_jl[Ni])))
 
-    log_zeta.append(np.log10(zeta_Ni))
-
-log_zeta = np.array(log_zeta)
-
-ionization = 0.0
-log_ionization = []
-
-print("Extremes of zeta(N) ",log_zeta[0], log_zeta[-1])
+print("Extremes of zeta(N) Padovani et al: ", log_forward_ion[0], log_forward_ion[-1])
 
 """  
 Mosaic With all the plots
@@ -183,7 +164,7 @@ for b, I in If.items():
 
 # Plot Ionization vs Column Density (Second plot)
 axs[0,0].plot(column_density, logzetafit, label='$log_{10}(\zeta) \, (\mathrm{Padovani \, et \, al})$', linestyle="--", color="grey")
-axs[0,0].plot(column_density, log_zeta, label='$log_{10}(\zeta_{\int dE})$', linestyle="-", color="black")
+axs[0,0].plot(column_density, log_forward_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="-", color="black")
 axs[0,0].plot(column_density, svnteen, label='$\zeta = 10^{-17}$', linestyle="--", color="skyblue")
 axs[0,0].set_xscale('log')
 axs[0,0].set_title('Ionization vs Column Density')
@@ -193,20 +174,12 @@ axs[0,0].legend()
 axs[0,0].grid(True)
 
 # Plot Spectrum j_p vs Energy (Third plot) 
-mid = len(column_density)//2
-#axs[0,1].plot(column_density, logzetafit, label='$log_{10}(\zeta) \, (\mathrm{Padovani \, et \, al})$', linestyle="--", color="grey")
-axs[0,1].plot(energy, proton_local_spectrum, label='$log_{10}(j_p(E)), (Ivlev, 2015)$',linestyle="--", color="dimgrey")
-axs[0,1].plot(energy, low_energy_proton_ism_spectrum, label='$log_{10}(j_i(E)), (Silsbee, 2018)$',linestyle=":", color="red")
-axs[0,1].plot(energy, forward_spectrum, label='$log_{10}(j_+)$',linestyle="--", color="blue")
-axs[0,1].plot(energy, np.log10(integrand_jl[column_density[-1]]), label='$log_{10}(\partial_{\mu}\partial_E \zeta(N=10^{27},\mu))$',linestyle=":", color="m")
-axs[0,1].plot(energy, np.log10(integrand_jl[column_density[0]]), label='$log_{10}(\partial_{\mu}\partial_E \zeta(N=10^{19},\mu))$',linestyle=":", color="c")
-axs[0,1].plot(energy, np.log10(integrand_jl[column_density[mid]]), label='$log_{10}(\partial_{\mu}\partial_E \zeta(N=10^{22},\mu))$',linestyle=":", color="y")
+#axs[0,1].plot(energy, proton_local_spectrum, label='$log_{10}(j_p(E)), (Ivlev, 2015)$',linestyle="--", color="dimgrey")
+#axs[0,1].plot(energy, low_energy_proton_ism_spectrum, label='$log_{10}(j_i(E)), (Silsbee, 2018)$',linestyle=":", color="red")
 axs[0,1].scatter(energy, proton_local_spectrum, marker="|",s=5, color="dimgrey")
 axs[0,1].scatter(energy, low_energy_proton_ism_spectrum, marker="|",s=5, color="red")
-axs[0,1].scatter(energy, forward_spectrum, marker="|",s=5, color="blue")
-axs[0,1].scatter(energy, np.log10(integrand_jl[column_density[0]]), marker="|",s=5, color="c")
-axs[0,1].scatter(energy, np.log10(integrand_jl[column_density[-1]]), marker="|",s=5, color="m")
 axs[0,1].set_xscale('log')
+
 axs[0,1].set_title('Spectrum $j_p$ vs Energy')
 axs[0,1].set_xlabel('Energy ($log_{10}(E / eV)$)')
 axs[0,1].set_ylabel('Spectrum $j_p$')
@@ -214,24 +187,20 @@ axs[0,1].set_ylabel('Spectrum $j_p$')
 axs[0,1].legend()
 axs[0,1].grid(True)
 
-q = np.array(log_lossEi) - np.array(log_lossE)
-# Plot Spectrum L(E) vs Energy (Fourth plot)
-axs[1,0].plot(energy, proton_ism_spectrum, label='$log_{10}(j_i(E_i)) \ ISM \ Spectrum$',linestyle="-", color="dimgrey")
-axs[1,0].plot(energy, log_lossE,label='$log_{10}(L(E))$', linestyle="--", color="pink")
+
+# Plot Spectrum L(E) vs Energy 
 axs[1,0].plot(energy, log_lossEi,label='$log_{10}(L(E_i))$', linestyle="--", color="orange")
-axs[1,0].plot(energy, q,label='$log_{10}(L(E_i)/L(E))$', linestyle="--", color="blue")
-axs[1,0].set_xscale('log')
-axs[1,0].scatter(energy, proton_ism_spectrum, marker="x", color="grey", s=5)
-axs[1,0].scatter(energy, log_lossE, marker="v", color="pink", s=5)
+axs[1,0].plot(energy, log_lossE,label='$log_{10}(L(E))$', linestyle="--", color="pink")
 axs[1,0].scatter(energy, log_lossEi, marker="^", color="orange",s=5)
-axs[1,0].scatter(energy, q, marker="|", color="blue",s=5)
+axs[1,0].scatter(energy, log_lossE, marker="v", color="pink", s=5)
+axs[1,0].set_xscale('log')
 axs[1,0].set_title('Loss Function vs Energy')
 axs[1,0].set_xlabel('Energy ($log_{10}(E / eV)$)')
-axs[1,0].set_ylabel('Spectrum $j_p$')
+axs[1,0].set_ylabel('Spectrum $j_p(E)$')
 axs[1,0].legend()
 axs[1,0].grid(True)
 
-# Plot Ei(E) vs Energy (First plot)
+# Plot Ei(E) vs Energy 
 axs[1, 1].plot(energy, (energy**(1 + d) + (1 + d) * Lstar* Estar**(d)* column_density[-1])**(1 / (1 + d)), label='$log_{10}(E_i(E, N=10^{27}))$', linestyle="-", color="red")
 axs[1, 1].plot(energy, (energy**(1 + d) + (1 + d) * Lstar* Estar**(d)* column_density[0])**(1 / (1 + d)), label='$log_{10}(E_i(E, N==10^{19}))$', linestyle="-", color="red")
 axs[1, 1].plot(energy, diff_energy, label='$log_{10}(\Delta(E))$', linestyle="--", color="dimgrey")
