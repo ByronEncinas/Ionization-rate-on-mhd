@@ -155,12 +155,13 @@ stop = False
 for mui in muforward: # from 1 to 0
     
     dcolumn_density = 0.0
+
     for i in range(len(distance)): # this        
 
         Bs                  = bfield[i]                      # Magnetic field strength at the interest point
         column_density_at_s = []
         
-        for j in range(len(distance[0:i])): # traverse s' along field lines until s
+        for j in range(len(distance[:i])): # traverse s' along field lines until s
             Bsprime   = bfield[j]
             bdash     = Bsprime / Bs  # Ratio of magnetic field strengths
             deno      = 1 - bdash * (1 - mui**2)
@@ -177,11 +178,24 @@ for mui in muforward: # from 1 to 0
             one_over         = 1.0 / np.sqrt(deno)               # Reciprocal of the square root term
             dcolumn_density += numb_den * ds * one_over   # Accumulate the contribution to column density        
         
-        column_density_at_s.append(dcolumn_density) # the index at column_density_at_mu corresponds with muforward index for the same \mu
-    
-    print("===FORWARDS===============>",i, mui, column_density_at_s[-1])
-    
+        column_density_at_s.append(dcolumn_density) # column_at_mu = [N_at_s0, N_at_s1, ...]
+
     forward_column_density_at_mu.append(column_density_at_s)
+
+    print("===FORWARDS===============>",i, mui, column_density_at_s[-1])
+
+    if stop == True:
+        stop == False
+        """ 
+        if column density at s reaches a point s_j < s then the particle does not reach 
+        that distance with its current \mu, and so the column at all further positions 
+        is unreachable for particles with same \mu. So the loop must continue with the next value of mu
+        """
+        continue
+    
+    
+    
+stop = False
 
 import json
 
@@ -196,17 +210,20 @@ del column_density_at_s
 
 backward_column_density_at_mu = []
 stop = False
+rev_bfield = bfield[::-1]
+rev_radius_vector = radius_vector[::-1]
+rev_distance = distance[::-1]
 
 for mui in mubackward: # from 1 to 0
     
     dcolumn_density = 0.0
-    for i in range(len(distance), len(distance)-1, -1): # this        
+    for i in range(len(distance)): # this        
 
-        Bs                  = bfield[i]                      # Magnetic field strength at the interest point
+        Bs                  = rev_bfield[i]                      # Magnetic field strength at the interest point
         column_density_at_s = []
         
-        for j in range(len(distance[i:-1])): # traverse s' along field lines until s
-            Bsprime   = bfield[j]
+        for j in range(len(distance[:i])): # traverse s' along field lines until s
+            Bsprime   = rev_bfield[j]
             bdash     = Bsprime / Bs  # Ratio of magnetic field strengths
             deno      = 1 - bdash * (1 - mui**2)
             #print(i, j, deno, dcolumn_density)
@@ -216,7 +233,7 @@ for mui in mubackward: # from 1 to 0
                 dcolumn_density = 0.0
                 stop = True
                 break
-            gaspos    = radius_vector[i]  # Position for s in structured grid
+            gaspos    = rev_radius_vector[i]  # Position for s in structured grid
             numb_den  = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0       
 
             one_over         = 1.0 / np.sqrt(deno)               # Reciprocal of the square root term
@@ -227,6 +244,14 @@ for mui in mubackward: # from 1 to 0
     print("===BACKWARDS===============>",i, mui, column_density_at_s[-1])
     
     backward_column_density_at_mu.append(column_density_at_s)
+    if stop == True:
+        stop == False
+        """ 
+        if column density at s reaches a point s_j < s then the particle does not reach 
+        that distance with its current \mu, and so the column at all further positions 
+        is unreachable for particles with same \mu. So the loop must continue with the next value of mu
+        """
+        continue
 
 # Specify the file path
 file_path = f'backward_column_density_mu={backward_column_density_at_mu}=.json'
@@ -248,7 +273,7 @@ if True:
     axs[0].legend()
     axs[0].grid(True)
     
-    axs[1].plot(distance, backward_column_density_at_mu[1], label=f'$N_-(\mu = -0.9*)', linestyle=":", color="c")
+    axs[1].plot(rev_distance, backward_column_density_at_mu[1], label=f'$N_-(\mu = -0.9*)', linestyle=":", color="c")
     axs[1].set_yscale('log')
     axs[1].set_title('Backward Column Densities')
     axs[1].set_xlabel('Index')
