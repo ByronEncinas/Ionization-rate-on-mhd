@@ -71,22 +71,13 @@ for i, Ni in enumerate(column_density): # will go from 3,4,5,6--- almost in inte
     jl_dE = 0.0
     for k, E in enumerate(energy): # will go from 3,4,5,6--- almost in integers#
 
-        if Ni == column_density[-1]:
-            proton_local_spectrum.append(log_proton_spectrum(E))         # J_p as in Padovani et al equation (1)
-            low_energy_proton_ism_spectrum.append(log_ism_spectrum(E)) # J_i(E) as in Silsbee, 2018 equation  (17)
-            log_proton_ism_spectrum.append(log_ism_spectrum(Ei))                    # J_i(E_i) as in Silsbee, 2018 equation  (17)
-            log_lossE.append(log_loss_function(E))                       # ==> L(E)
-            log_lossEi.append(log_loss_function(Ei))                            # ==> L(Ei) Loss function inside cloud for Entrance energy (Ei)
-            log_jp = log_proton_ism_spectrum[-1] + log_lossEi[-1] - log_lossE[-1]   # J_+ as in Silsbee, 2018 equation  (11)
-            forward_spectrum.append(log_jp)
-
         Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* Ni)**(1 / (1 + d)) # E_i(E, N)
 
         isms = ism_spectrum(Ei)            # log_10(j_i(E_i))
         llei = loss_function(Ei)           # log_10(L(E_i))
         jl_dE += isms*llei*diff_energy[k] # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
         
-    zeta_Ni = jl_dE/epsilon/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
+    zeta_Ni = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
     
     log_forward_ion.append(np.log10(zeta_Ni))
 

@@ -132,156 +132,125 @@ right_distance, right_radius_vector, right_bfield_magnitudes = trajectory(point_
 # this [1:] cut is because both lists contain the initial point
 f = max(left_distance)
 
-distance = list(left_distance) + [f + d for d in right_distance[1:]]
-radius_vector = list(left_radius_vector) + right_radius_vector[1:]
-bfield        = list(left_bfield_magnitudes) + right_bfield_magnitudes[1:]
+distance      = np.array(list(left_distance) + [f + d for d in right_distance[1:]])
+radius_vector = np.array(list(left_radius_vector) + right_radius_vector[1:])
+bfield        = np.array(list(left_bfield_magnitudes) + right_bfield_magnitudes[1:])
 
 print("Simulation Successfull")
 
-size = 200
-precision = size
+precision = 200
 
-muforward   = np.array([1 - k/(10) for k in range(11)]) # Backward Ionization
-mubackward  = np.array([k/(10)-1 for k in range(11)]) # Backward Ionization
+muforward   = np.array([k/(10) for k in range(1,11)]) # Forward Ionization
+mubackward  = np.array([k/(10)-1 for k in range(0,10)]) # Backward Ionization
 
 dmu = 1/precision
 
 ############----------------------------------FORWARD----------------------------------############
+
 ds = abs(distance[1] - distance[0]) # they are equally space (unito * delta)
 
-forward_column_density_at_mu = []
-stop = False
+s = np.random.uniform(0,1,2)
+#mu_ism    = np.flip(sorted(np.exp(-abs(s))))
+mu_ism = np.flip(np.logspace(-3,0,1000))
 
-for mui in muforward: # from 1 to 0
-    
-    dcolumn_density = 0.0
+np.save("PitchAngleCosines.npy", mu_ism)
 
-    for i in range(len(distance)): # this        
+c = (len(mu_ism), len(distance))
+Nforward  = np.zeros(c)
 
-        Bs                  = bfield[i]                      # Magnetic field strength at the interest point
-        column_density_at_s = []
+B_ism     = bfield[0]
+
+for i, mui_ism in enumerate(mu_ism):
+    print("====================>  ",mui_ism)
+
+    for j in range(len(distance)):
         
-        for j in range(len(distance[:i])): # traverse s' along field lines until s
-            Bsprime   = bfield[j]
-            bdash     = Bsprime / Bs  # Ratio of magnetic field strengths
-            deno      = 1 - bdash * (1 - mui**2)
-            #print(i, j, deno, dcolumn_density)
-            
-            if deno < 0: 
-                # this pitch angle cosine doesnt reach s so it wont affect the column density
-                dcolumn_density = 0.0
-                stop = True
-                break
-            gaspos    = radius_vector[i]  # Position for s in structured grid
-            numb_den  = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0       
-
-            one_over         = 1.0 / np.sqrt(deno)               # Reciprocal of the square root term
-            dcolumn_density += numb_den * ds * one_over   # Accumulate the contribution to column density        
+        gaspos    = radius_vector[j]  # Position for s in structured grid
+        num_den_j = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0      
+        Bsprime   = bfield[j]
+        deno      = 1 - (Bsprime/B_ism) * (1 - mui_ism**2)
         
-        column_density_at_s.append(dcolumn_density) # column_at_mu = [N_at_s0, N_at_s1, ...]
+        if deno < 0:
+            """ 
+            1 - (Bsprime/B_ism) * (1 - muj_ism**2) < 0
+            """
+            break
+        
+        delta_nj  = ds / np.sqrt(deno)
+        Nforward[i,j] = Nforward[i,j-1] + num_den_j*delta_nj
 
-    forward_column_density_at_mu.append(column_density_at_s)
+np.save("ForwardColumn.npy", Nforward)
 
-    print("===FORWARDS===============>",i, mui, column_density_at_s[-1])
 
-    if stop == True:
-        stop == False
-        """ 
-        if column density at s reaches a point s_j < s then the particle does not reach 
-        that distance with its current \mu, and so the column at all further positions 
-        is unreachable for particles with same \mu. So the loop must continue with the next value of mu
-        """
-        continue
-    
-    
-    
-stop = False
 
-import json
+############---------------------------------BACKWARD----------------------------------############
 
-# Specify the file path
-file_path = f'forward_column_density_mu={len(forward_column_density_at_mu)}.json'
+ds = abs(distance[1] - distance[0]) # they are equally space (unito * delta)
 
-# Write the list data to a JSON file
-with open(file_path, 'w') as json_file:
-    json.dump(forward_column_density_at_mu, json_file)
-
-del column_density_at_s
-
-backward_column_density_at_mu = []
-stop = False
-rev_bfield = bfield[::-1]
+c = (len(mu_ism), len(distance))
+Nbackward  = np.zeros(c)
 rev_radius_vector = radius_vector[::-1]
-rev_distance = distance[::-1]
+rev_bfield        = bfield[::-1]
+B_ism     = bfield[-1]
 
-for mui in mubackward: # from 1 to 0
-    
-    dcolumn_density = 0.0
-    for i in range(len(distance)): # this        
+for i, mui_ism in enumerate(mu_ism):
+    mui_ism = -mui_ism
+    print("====================> ", mui_ism)
 
-        Bs                  = rev_bfield[i]                      # Magnetic field strength at the interest point
-        column_density_at_s = []
+    for j in range(len(distance)):
         
-        for j in range(len(distance[:i])): # traverse s' along field lines until s
-            Bsprime   = rev_bfield[j]
-            bdash     = Bsprime / Bs  # Ratio of magnetic field strengths
-            deno      = 1 - bdash * (1 - mui**2)
-            #print(i, j, deno, dcolumn_density)
-            
-            if deno < 0: 
-                # this pitch angle cosine doesnt reach s so it wont affect the column density
-                dcolumn_density = 0.0
-                stop = True
-                break
-            gaspos    = rev_radius_vector[i]  # Position for s in structured grid
-            numb_den  = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0       
-
-            one_over         = 1.0 / np.sqrt(deno)               # Reciprocal of the square root term
-            dcolumn_density += numb_den * ds * one_over   # Accumulate the contribution to column density        
+        gaspos    = rev_radius_vector[j]  # Position for s in structured grid
+        num_den_j = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0      
+        Bsprime   = rev_bfield[j]
+        deno      = 1 - (Bsprime/B_ism) * (1 - mui_ism**2)
         
-        column_density_at_s.append(dcolumn_density) # the index at column_density_at_mu corresponds with muforward index for the same \mu
-    
-    print("===BACKWARDS===============>",i, mui, column_density_at_s[-1])
-    
-    backward_column_density_at_mu.append(column_density_at_s)
-    if stop == True:
-        stop == False
-        """ 
-        if column density at s reaches a point s_j < s then the particle does not reach 
-        that distance with its current \mu, and so the column at all further positions 
-        is unreachable for particles with same \mu. So the loop must continue with the next value of mu
-        """
-        continue
+        if deno < 0:
+            """ 
+            1 - (Bsprime/B_ism) * (1 - muj_ism**2) < 0
+            """
+            break
+        
+        delta_nj  = ds / np.sqrt(deno)
+        Nbackward[i,j] = Nbackward[i,j-1] + num_den_j*delta_nj
 
-# Specify the file path
-file_path = f'backward_column_density_mu={backward_column_density_at_mu}=.json'
-
-# Write the list data to a JSON file
-with open(file_path, 'w') as json_file:
-    json.dump(backward_column_density_at_mu, json_file)
+np.save("BackwardColumn.npy", Nbackward)
 
 if True:
+    import matplotlib.cm as cm
 
-    fig, axs = plt.subplots(2, 1, figsize=(10, 10))  # Create a 2x1 grid of subplots
+    colors = cm.rainbow(np.linspace(0, 1, len(mu_ism)))
 
-    axs[0].plot(distance, forward_column_density_at_mu[1], label=f'$N_+(\mu = 0.9)$', linestyle=":", color="c")
-    #axs[0].plot(distance, column_density_at_all_s_with_mu1, label=f'N($\mu = 1.0$)', linestyle=":", color="m")
+    fig, axs = plt.subplots(3, 1, figsize=(10, 10))  # Create a 2x1 grid of subplots
+
+    for i, c in enumerate(colors):
+        axs[0].scatter(distance/10e+18, Nforward[i,:], label=f'$N_+(\mu_i = {mu_ism[i]})$', linestyle="--", color=c, s =5)
+
     axs[0].set_yscale('log')
-    axs[0].set_title('Forward Column Densities')
-    axs[0].set_xlabel('Distance (s)')
-    axs[0].set_ylabel('Column Density $log_10(N(\mu))$ (log scale)')
-    axs[0].legend()
+    #axs[0].set_xscale('log')
+    #axs[0].set_title('Forward Column Densities')
+    axs[0].set_ylabel('$log_10(N_+(\mu))$ (log scale)')
+    #axs[0].legend()
     axs[0].grid(True)
     
-    axs[1].plot(rev_distance, backward_column_density_at_mu[1], label=f'$N_-(\mu = -0.9*)', linestyle=":", color="c")
-    axs[1].set_yscale('log')
-    axs[1].set_title('Backward Column Densities')
-    axs[1].set_xlabel('Index')
-    axs[1].set_ylabel('Column Density $log_10(N(\mu))$ (log scale)')
-    axs[1].legend()
-    axs[1].grid(True)
+    for i, c in enumerate(colors):
+        axs[1].scatter(distance/10e+18, Nbackward[i,:], label=f'$N_-(\mu_i = -{mu_ism[i]})$', linestyle="--", color=c, s=5)
 
-    plt.tight_layout(pad=5)
-    plt.savefig("b_output_data/Columns.png")
+    axs[1].set_yscale('log')
+    #axs[1].set_xscale('log')
+    #axs[1].set_title('Backward Column Densities')
+    axs[1].set_xlabel('Distance ($s$ $cm/10^{18}$)')
+    axs[1].set_ylabel('$log_10(N_-(\mu_i))$ (log scale)')
+    #axs[0].legend()
+    axs[1].grid(True)
+    
+    
+    axs[2].plot(mu_ism, label=f'$\mu_i-distribution$', linestyle=":", color="m")
+    #axs[2].set_title('$\mu_i$ distribution')
+    axs[2].set_xlabel('Index')
+    axs[2].set_ylabel('$\mu_i$ distribution')
+    axs[2].legend()
+    axs[2].grid(True)
+
+    plt.savefig("b_output_data/Columns&MuiDistro.png")
 
     #plt.show()

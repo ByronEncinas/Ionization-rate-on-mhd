@@ -54,7 +54,8 @@ def pocket_finder(bmag, cycle=0, plot =False):
     for B in bmag:
         Bj = B
         if Bj < Bi and (len(lpeaks) == 0 or Bi > lpeaks[-1] ): # if True, then we have a peak
-            lindex.append(bmag.index(Bi))
+            index = np.where(bmag==Bi)[0][0]
+            lindex.append(index)
             lpeaks.append(Bi)
         Bi = B
     Bj = bmag[-1]
@@ -64,14 +65,15 @@ def pocket_finder(bmag, cycle=0, plot =False):
     for B in reversed(bmag):
         Bj = B
         if Bj < Bi and (len(rpeaks) == 0 or Bi > rpeaks[-1]): # if True, then we have a peak
-            rindex.append(bmag.index(Bi))
+            index = np.where(bmag==Bi)[0][0]
+            rindex.append(index)
             rpeaks.append(Bi)
         Bi = B
     peaks = lpeaks + list(reversed(rpeaks))[1:]
     indexes = lindex+list(reversed(rindex))[1:] 
     baseline = min(bmag)
     upline = max(bmag)
-    index_global_max = bmag.index(upline)
+    index_global_max = np.where(bmag==upline)[0][0]
     
     if plot:
         # Create a figure and axes for the subplot layout

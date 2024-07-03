@@ -133,9 +133,9 @@ right_distance, right_radius_vector, right_bfield_magnitudes = trajectory(point_
 # this [1:] cut is because both lists contain the initial point
 f = max(left_distance)
 
-distance = list(left_distance) + [f + d for d in right_distance[1:]]
-radius_vector = list(left_radius_vector) + right_radius_vector[1:]
-bfield        = list(left_bfield_magnitudes) + right_bfield_magnitudes[1:]
+distance      = np.array(list(left_distance) + [f + d for d in right_distance[1:]])
+radius_vector = np.array(list(left_radius_vector) + right_radius_vector[1:])
+bfield        = np.array(list(left_bfield_magnitudes) + right_bfield_magnitudes[1:])
 
 if True:
     with open(f"c_field_lines.txt", "w") as c1_data:
@@ -153,7 +153,7 @@ Reproduce M. Padovani et al.: Cosmic-ray ionisation in circumstellar discs Ioniz
 
 """
 size = 200
-precision = size
+
 Ei = 1.0e+0
 Ef = 1.0e+15
 
@@ -184,114 +184,6 @@ Jstar = 2.4e+15*(1.0e+6)**(0.1)/(Enot**2.8)
 Estar = 1.0e+6
 Epion = 280e+6
 
-""" 
-Column Densities
-
-    - sim_column_density: list(list()) => [for mu = 0/size,[N0, N1, ..., Nf], for mu=1/size, ...]
-    - indie_column_density: list() => [10^3 => 10^27] as done in b1_padovani.py
-"""
-
-muforward   = np.array([k/(50) for k in range(50)]) # Backward Ionization
-mubackward  = np.array([k/(50)-1 for k in range(50)]) # Backward Ionization
-
-energy      = np.array([1.0e+2*(10)**(14*k/size) for k in range(size)])  # Energy values from 1 to 10^15
-diff_energy = np.array([(10)**(14*k/size) for k in range(size)])
-logenergy   = np.log10(energy)                                        # log10(Energy) values from 0 to 15
-column_density = np.array([1.0e+19*(10)**(8*k/precision) for k in range(precision)])
-
-print("Extremes of Independent N ", np.log10(column_density[0]), np.log10(column_density[-1]))
-
-column_density_forward  = {}
-column_density_backward = {}
-#column_density_forward  = []
-#column_density_backward = []
-
-dmu = 1/precision
-
-############----------------------------------FORWARD----------------------------------############
-
-for mui in muforward:
-    column_density_forward[mui] = 0.0
-    Bats                    = bfield[-1]                     # Magnetic field strength at the stopping point
-    dcolumn_density         = 0.0
-    ds                      = abs(distance[1] - distance[0]) # they are equally space (unito * delta)
-    for i in range(len(distance)): # this        
-        gaspos    = radius_vector[i]  # Position for s in structured grid
-        numb_den  = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0       
-        cur_distance = distance[i]
-        Bsprime   = bfield[i]
-        bdash     = Bsprime / Bats  # Ratio of magnetic field strengths
-        deno      = 1 - bdash * (1 - mui**2)
-        
-        if deno < 0:
-            column_density_forward[mui] = dcolumn_density
-            break
-
-        one_over         = 1.0 / np.sqrt(deno)               # Reciprocal of the square root term
-        dcolumn_density += numb_den * ds * one_over   # Accumulate the contribution to column density
-    column_density_forward[mui] = dcolumn_density
-    #column_density_forward.append(dcolumn_density)
-
-############----------------------------------BACKWARD----------------------------------############
-
-for mui in mubackward:
-    column_density_backward[mui] = 0.0
-    Bats                    = bfield[0]                     # Magnetic field strength at the stopping point
-    dcolumn_density         = 0.0
-    ds                      = abs(distance[1] - distance[0]) # they are equally space (unito * delta)
-    for i in range(len(distance)-1, 0, -1): # this     
-        gaspos    = radius_vector[i]  # Position for s in structured grid
-        numb_den  = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0       
-        cur_distance = distance[i]
-        Bsprime   = bfield[i]
-        bdash     = Bsprime / Bats  # Ratio of magnetic field strengths
-        deno      = 1 - bdash * (1 - mui**2)
-        
-        if deno < 0:
-            column_density_backward[mui] = dcolumn_density
-            break
-        one_over         = 1.0 / np.sqrt(deno)               # Reciprocal of the square root term
-        dcolumn_density += numb_den * ds * one_over   # Accumulate the contribution to column density
-    column_density_backward[mui] = [dcolumn_density]
-    #column_density_backward.append(dcolumn_density)
-
-if True:
-
-    fig, axs = plt.subplots(2, 1, figsize=(10, 10))  # Create a 2x1 grid of subplots
-
-    #colors = cm.rainbow(np.linspace(0, 1, len(list(column_density_forward.keys())[0:])))
-
-    count = 0
-    #for c, mui in zip(colors, list( sim_column_density_forward.keys())[0:] ):
-    #    axs[0].plot(sim_column_density_forward[mui], label=f'N($\mu={mui}$)', linestyle=":", color=c)
-    #    count += 1
-
-    axs[0].plot(muforward, column_density_forward.values(), label=f'N($\mu$)', linestyle=":", color="black")
-    axs[0].set_yscale('log')
-    axs[0].set_title('Forward Column Densities')
-    axs[0].set_xlabel('Index')
-    axs[0].set_ylabel('Column Density $log_10(N(\mu))$ (log scale)')
-    axs[0].grid(True)
-
-    #axs[0].legend()
-    #colors = cm.rainbow(np.linspace(0, 1, len(list(column_density_backward.keys())[0:])))
-
-    count = 0
-    #for c, mui in zip(colors, list(sim_column_density_backward.keys())[0:]):
-    #    axs[1].plot(sim_column_density_backward[mui], label=f'N($\mu={mui}$)', linestyle=":", color=c)
-    #    count += 1
-    axs[1].plot(mubackward, column_density_backward.values(), label=f'N($\mu$)', linestyle=":", color="black")
-    axs[1].set_yscale('log')
-    axs[1].set_title('Backward Column Densities')
-    axs[1].set_xlabel('Index')
-    axs[1].set_ylabel('Column Density $log_10(N(\mu))$ (log scale)')
-    axs[1].grid(True)
-    #axs[1].legend()
-
-
-    plt.tight_layout(pad=5)
-    plt.savefig("b_output_data/b_sim_column_densities_mosaic.png")
-    plt.show()
 
 """ 
 Ionization Calculation
@@ -307,6 +199,13 @@ diff_energy = np.array([(10)**(14*k/size) for k in range(size)])
 logenergy = np.log10(energy)                                        # log10(Energy) values from 0 to 15
 column_density = np.array([1.0e+19*(10)**(8*k/size) for k in range(size)])
 
+print("Extremes of Independent N ", np.log10(column_density[0]), np.log10(column_density[-1]))
+
+""" 
+# Column Density as Independent Variable
+Using Lists
+"""
+
 # for one value of \mu only
 log_lossE = []
 log_lossEi = []
@@ -317,7 +216,7 @@ forward_spectrum = []
 integrand_jl = {}
 proton_spectrum = 0.0
 ism_spectrum = 0.0
-zeta_Ni  = 0.0
+zeta_N  = 0.0
 
 log_proton_spectrum = lambda E: np.log10(C) + 0.1*np.log10(E) - 2.8*np.log10(Enot + E) # J_p as in (Ivlev, 2015), Padovani et al equation (1)
 proton_spectrum = lambda E: C*E**0.1/(Enot + E)**2.8
@@ -327,100 +226,152 @@ log_loss_function = lambda z: np.log10(Lstar) - d*(np.log10(z) - np.log10(Estar)
 ism_spectrum = lambda x: Jstar*(x/Estar)**a
 loss_function = lambda z: Lstar*(Estar/z)**d
 
-log_ion = []
+log_ion = np.zeros((len(column_density)))
 
-for i, Ni in enumerate(column_density): # will go from 3,4,5,6--- almost in integers#
+for j, Nj in enumerate(column_density): # will go from 3,4,5,6--- almost in integers#
 
     jl_dE = 0.0
 
     for k, E in enumerate(energy): # will go from 3,4,5,6--- almost in integers#
 
-        Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* Ni)**(1 / (1 + d)) # E_i(E, N)
+        Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* Nj)**(1 / (1 + d)) # E_i(E, N)
 
         isms = ism_spectrum(Ei)            # log_10(j_i(E_i))
         llei = loss_function(Ei)           # log_10(L(E_i))
         jl_dE += isms*llei*diff_energy[k] # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
         
-    zeta_Ni = jl_dE/epsilon/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
-    log_ion.append(np.log10(zeta_Ni))
+    zeta_N = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
+    log_ion[j] = np.log10(zeta_N)
 
 print("Extremes of zeta(N) Padovani et al: ", log_ion[0], log_ion[-1])
 
 integrand_forward_jl = {}
 forward_logz = []
 
+
+""" 
+# Import Column Densities for Forward and Backward Moving Particles
+
+"""
+mu_ism    = np.array(np.load("PitchAngleCosines.npy", mmap_mode='r'))
+diff_mu_ism = np.array([mu_ism[i-1]-mu_ism[i] for i in range(len(mu_ism))]) #mu_ism is decreasing
+diff_mu_ism[0] = mu_ism[0]
+mu_ism_x_diff = mu_ism*diff_mu_ism
+
+ForwardColumn  = np.array(np.load("ForwardColumn.npy", mmap_mode='r'))
+BackwardColumn = np.array(np.load("BackwardColumn.npy", mmap_mode='r'))
+
+
+if False:
+    import matplotlib.cm as cm
+
+    colors = cm.rainbow(np.linspace(0, 1, len(mu_ism)))
+
+    fig, axs = plt.subplots(2, 1, figsize=(10, 10))  # Create a 2x1 grid of subplots
+
+    for i, c in enumerate(colors):
+        axs[0].scatter(distance/10e+18, ForwardColumn[i,:], label=f'$N_+$-map', linestyle="--", color=c, s =5)
+
+    axs[0].set_yscale('log')
+    axs[0].set_ylabel('$log_10(N_+(\mu))$ (log scale)')
+    #axs[0].legend()
+    axs[0].grid(True)
+    
+    for i, c in enumerate(colors):
+        axs[1].scatter(distance/10e+18, BackwardColumn[i,:], label=f'$N_-$-map', linestyle="--", color=c, s=5)
+
+    axs[1].set_yscale('log')
+    axs[1].set_xlabel('Distance ($s$ $cm/10^{18}$)')
+    axs[1].set_ylabel('$log_10(N_-(\mu_i))$ (log scale)')
+    #axs[0].legend()
+    axs[1].grid(True)
+    
+    plt.show()
+
 """ 
 # forward moving Cosmic Rays 
 
 """
 
-#for i, Ni in enumerate(column_density_forward): # will go from 3,4,5,6--- almost in integers#
-log_forward_ion = []
+c = (len(mu_ism), len(ForwardColumn[0,:])) #ForwardColumn[0,:] = ForwardColumn[mu=1,:] so its expected is the biggest 1D of all
+log_forward_ion = np.zeros(c)
 
-for i, Ni in enumerate(column_density): # will go from 3,4,5,6--- almost in integers#
+for i, mui in enumerate(mu_ism):
+    print(i, mui)
+    for j, Nj in enumerate(ForwardColumn[i,:]): 
+        jl_dE = 0.0
+        for k, E in enumerate(energy): # will go from 3,4,5,6--- almost in integers#
 
-    jl_dE = 0.0
+            Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* Nj)**(1 / (1 + d)) # E_i(E, N)
 
-    for k, E in enumerate(energy): # will go from 3,4,5,6--- almost in integers#
+            isms = ism_spectrum(Ei)            # log_10(j_i(E_i))
+            llei = loss_function(Ei)           # log_10(L(E_i))
+            jl_dE += isms*llei*diff_energy[k] # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
+            
+        zeta_Ni = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
 
-        Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* Ni)**(1 / (1 + d)) # E_i(E, N)
+        log_forward_ion[i,j] = np.log10(zeta_Ni)
 
-        isms = ism_spectrum(Ei)            # log_10(j_i(E_i))
-        llei = loss_function(Ei)           # log_10(L(E_i))
-        jl_dE += isms*llei*diff_energy[k] # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
-        
-    zeta_Ni = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
-    
-    log_forward_ion.append(np.log10(zeta_Ni))
+print("Extremes of zeta(N, \mu=1) forward: ", log_forward_ion[0,0], log_forward_ion[0,-1])
 
-print("Extremes of zeta(N) forward: ", log_forward_ion[0], log_forward_ion[-1])
+forward_ion_differential = np.transpose(10**log_forward_ion)*diff_mu_ism
+f_overall_ionization = np.log10(np.sum(forward_ion_differential, axis=1))
+
+print("log10(zeta_-(s,mu))\n",log_forward_ion)
+print("Delta mu\n",diff_mu_ism)
+print("zeta(s,mu)*Delta mu\n",forward_ion_differential)
+print("log10(zeta(s))\n",f_overall_ionization)
 
 """ 
 # backward moving Cosmic Rays 
 
 """
-log_backward_ion = []
+c = (len(mu_ism), len(BackwardColumn[0,:]))
+log_backward_ion  = np.zeros(c)
 
-#for i, Ni in enumerate(column_density_backward):
-for i, Ni in enumerate(column_density): # will go from 3,4,5,6--- almost in integers#
+for i, mui in enumerate(-1*mu_ism):
+    print(i, mui)
+    for j, Nj in enumerate(BackwardColumn[i,:]): # will go from 3,4,5,6--- almost in integers#
 
-    # integrate with mui here <==
+        jl_dE = 0.0
 
-    jl_dE = 0.0
+        for k, E in enumerate(energy): 
 
-    for k, E in enumerate(energy): 
-
-        Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* 0.0)**(1 / (1 + d)) # E_i(E, N)
- 
-        isms  = ism_spectrum(Ei)            # log_10(j_i(E_i))
-        llei  = loss_function(Ei)           # log_10(L(E_i))
-        jl_dE += isms*llei*diff_energy[k]   # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
-        
-    zeta_Ni = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
+            Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* Nj)**(1 / (1 + d)) # E_i(E, N)
     
-    log_backward_ion.append(np.log10(zeta_Ni))
+            isms  = ism_spectrum(Ei)            # log_10(j_i(E_i))
+            llei  = loss_function(Ei)           # log_10(L(E_i))
+            jl_dE += isms*llei*diff_energy[k]   # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
+            
+        zeta_Ni = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
+        
+        log_backward_ion[i,j] = np.log10(zeta_Ni)
 
-print("Extremes of zeta(N) backward", log_backward_ion[0], log_backward_ion[-1])
+print("Extremes of zeta(N, \mu=1) backward", log_backward_ion[0,0], log_backward_ion[0,-1])
+
+backward_ion_differential = np.transpose(10**log_backward_ion)*diff_mu_ism
+
+b_overall_ionization = np.log10(np.sum(backward_ion_differential, axis=1))
+
+print("log10(zeta_-(s,mu))\n",log_backward_ion)
+print("Delta mu\n",diff_mu_ism)
+print("zeta(s,mu)*Delta mu\n",backward_ion_differential)
+print("log10(zeta_-(s))\n",b_overall_ionization)
 
 """  
 Mirrored Particles
 
 """
-(indexes, peaks), (index_global_max, upline) = pocket_finder(bfield, 0, plot=False)
+pairs, (index_global_max, upline) = pocket_finder(bfield, 0, plot=False)
 
 # lets make a list of pairs corresponding to regions considered pockets
 
-zeta_Ni = 0.0
-mirrored_logz = []
-integrand_mirrored_jl = {}
 
 
 
 
 
-
-
-
+total_ionization = np.log10(10**f_overall_ionization + 10**b_overall_ionization[::-1])
 
 """  
 \mathcal{L} Model: Protons
@@ -433,16 +384,12 @@ model_L = [-3.331056497233e+6, 1.207744586503e+6,-1.913914106234e+5,
 
 logz = []
 
-differential_fit = lambda z2,z1,e2,e1: (z2-z1)/(e2-e1) # slope of a log function log(F_2) = m log(e2) + const.
-derivative_fit = []
-
 for i,Ni in enumerate(column_density):
     lz = sum( [cj*(np.log10(Ni))**j for j, cj in enumerate(model_L)] )
     logz.append(lz)
-
     difflogfit = (0.0)
 
-print("Extremes of fitting zeta(N) ",logz[0], logz[-1])
+print("Extremes of fitting zeta(N) ", logz[0], logz[-1])
 
 logzetafit = np.array(logz)
 svnteen = np.ones_like(column_density)*(-17)
@@ -486,46 +433,59 @@ for c, (b, I) in zip(colors, If.items()):
     axs[0, 0].plot(column_density, free_streaming_ion, label=f'$log(\zeta_f(N, a={a}))$', linestyle="--", color=c)
     axs[0, 0].text(column_density[-1], free_streaming_ion[-1], f'a={a}, $\gamma_f$={gammaf:.2f}', fontsize=10, color=c)
 
-# Plot Ionization vs Column Density (Second plot)
+# Plot Ionization vs Column Density (First plot)
 axs[0,0].plot(column_density, logzetafit, label='$log_{10}(\zeta) \, (\mathrm{Padovani \, et \, al})$', linestyle="--", color="grey")
 axs[0,0].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="-", color="black")
 axs[0,0].plot(column_density, svnteen, label='$\zeta = 10^{-17}$', linestyle=":", color="dimgrey")
 axs[0,0].set_xscale('log')
 axs[0,0].set_title('Ionization vs Column Density')
-axs[0,0].set_xlabel('Column Density (log scale)')
-axs[0,0].set_ylabel('Ionization (log scale)')
+axs[0,0].set_xlabel('$N cm^{-2}$ (log scale)')
+axs[0,0].set_ylabel('$\zeta(N)$ (log scale)')
 axs[0,0].legend()
 axs[0,0].grid(True)
 
-# Plot Spectrum j_p vs Energy (Third plot) 
+colors = cm.rainbow(np.linspace(0, 1, len(distance)))
+
+# Plot s vs ionization by both forward and backward moving particles (Second plot) 
+#axs[0,1].scatter(distance, total_ionization,label='$\zeta(s)$', linestyle="--", color="skyblue", s=5)
+#axs[0,1].scatter(BackwardColumn[0,:], b_overall_ionization,label='$\zeta_-(s)$', marker="v", color="c", s=5)
+axs[0,1].scatter(ForwardColumn[0,:], f_overall_ionization,label='$\zeta_+(s)$', marker="^", color="m", s=7)
+#axs[0,1].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="--", color="dimgrey")
 axs[0,1].set_xscale('log')
-axs[0,1].set_title('Spectrum $j_p$ vs Energy')
-axs[0,1].set_xlabel('Energy ($log_{10}(E / eV)$)')
-axs[0,1].set_ylabel('Spectrum $j_p$')
-#axs[0,1].set_ylim([-180, 0])
-#axs[0,1].legend()
+axs[0,1].set_title('Ionizations at the trajectory')
+axs[0,1].set_xlabel('s')
+axs[0,1].set_ylabel('$\zeta(N)$ (log scale)')
 axs[0,1].grid(True)
 
+svnteen = np.ones_like(ForwardColumn[-1,:])*(-15)
 
-# Plot Ionization vs Column Density (Second plot)
-#axs[1,0].plot(column_density_forward.values(), forward_logzeta, label='$log_{10}(\zeta_f) \, (Forward \ CRs)$', linestyle="--", color="blue")
-#axs[1,0].scatter(column_density_forward.values(), forward_logzeta, marker="*", color="blue")
-#axs[1,0].plot(column_density_backward.values(), backward_logzeta, label='$log_{10}(\zeta_b) \, (Backwards \ CRs)$', linestyle="--", color="red")
-#axs[1,0].scatter(column_density_backward.values(), backward_logzeta, marker="|", color="red")
-axs[1,0].plot(column_density, svnteen, label='$\zeta = 10^{-17}$', linestyle="--", color="black")
-axs[1,0].plot(column_density, log_forward_ion, label='$\zeta = 10^{-17}$', linestyle="--", color="black")
+colors = cm.rainbow(np.linspace(0, 1, len(mu_ism)))
+
+# Plot Ionization vs Column Density (Third plot)
+for i, c in enumerate(colors):
+    axs[1,0].scatter(ForwardColumn[i,:], log_forward_ion[i,:], label=f'$\zeta(mu_i={mu_ism[i]})$', marker="|", color=c, s=5)
+
+axs[1,0].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="--", color="dimgrey")
 axs[1,0].set_xscale('log')
-axs[1,0].set_title('Ionization Populations Using Margo\'s Data')
-axs[1,0].set_xlabel('Column Densities (log scale)')
-axs[1,0].set_ylabel('Ionization (log scale)')
-axs[1,0].legend()
+axs[1,0].set_xlabel('$N(s_f - s_{rev})$ (log scale)')
+axs[1,0].set_ylabel('$\zeta_-(N(s_f - s_{rev}))$ (log scale)')
+#axs[1,0].legend()
+#axs[1,0].set_ylim([-16, -15])
 axs[1,0].grid(True)
 
+svnteen = np.ones_like(BackwardColumn[-1,:])*(-15)
+
+colors = cm.rainbow(np.linspace(0, 1, len(mu_ism)))
+
+for i, c in enumerate(colors):
+    axs[1,1].scatter(BackwardColumn[i,:], log_backward_ion[i,:], label=f'$\zeta(mu_i={-mu_ism[i]})$', marker="|", color=c, s=5)
 # Plot Spectrum L(E) vs Energy (Fourth plot)
-axs[1,1].set_title('Loss Function vs Energy')
-axs[1,1].set_xlabel('Energy ($log_{10}(E / eV)$)')
-axs[1,1].set_ylabel('Spectrum $j_p$')
+axs[1,1].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="--", color="dimgrey")
+axs[1,1].set_xscale('log')
+axs[1,1].set_xlabel('$N(s)$ (log scale)')
+axs[1,1].set_ylabel('$\zeta_+(N(s))$ (log scale)')
 #axs[1,1].legend()
+#axs[1,1].set_ylim([-16, -15])
 axs[1,1].grid(True)
 
 fig.tight_layout(pad=2.0)
