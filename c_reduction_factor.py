@@ -48,49 +48,45 @@ if True:
     # Velocity Dispersion
     vel_disp = np.array(np.load("input_data/velocity_dispersion.npy", mmap_mode='r'))
 
-#print(np.mean(gas_den)) ~ 22.660904340815943 as number density
+    if True:
+        """  
+        Unstructured X, Y, Z Mesh Grid
+        """
 
-if True:
-    """  
-    Unstructured X, Y, Z Mesh Grid
-    """
+        scale_factor = 0.0 
+        relativepos = [x[0][0][1]-x[0][0][0], y[0][0][1]-y[0][0][0], z[0][0][1]-z[0][0][0]]
+        scale_factor += magnitude(relativepos)
+        relativepos = [x[0][1][0]-x[0][0][0], y[0][1][0]-y[0][0][0], z[0][1][0]-z[0][0][0]]
+        scale_factor += magnitude(relativepos)
+        relativepos = [x[1][0][0]-x[0][0][0], y[1][0][0]-y[0][0][0], z[1][0][0]-z[0][0][0]]
+        scale_factor += magnitude(relativepos)
+        scale_factor /= 3.0 
 
-    scale_factor = 0.0 
-    relativepos = [x[0][0][1]-x[0][0][0], y[0][0][1]-y[0][0][0], z[0][0][1]-z[0][0][0]]
-    scale_factor += magnitude(relativepos)
-    relativepos = [x[0][1][0]-x[0][0][0], y[0][1][0]-y[0][0][0], z[0][1][0]-z[0][0][0]]
-    scale_factor += magnitude(relativepos)
-    relativepos = [x[1][0][0]-x[0][0][0], y[1][0][0]-y[0][0][0], z[1][0][0]-z[0][0][0]]
-    scale_factor += magnitude(relativepos)
-    scale_factor /= 3.0 
+    global TOTAL_TIME, SNAPSHOTS, TIMESTEP
 
-global TOTAL_TIME, SNAPSHOTS, TIMESTEP
+    # CONSTANT
+    point_i, point_j, point_k = int(), int(), int()
+    TOTAL_TIME = 9000000
+    TIMESTEP   = 0.05
+    SNAPSHOTS  = int(TOTAL_TIME/TIMESTEP)
+    CONST      = 1.0e+3
+    DS         = 128
+    MARGIN     = 34
 
-# CONSTANT
-point_i, point_j, point_k = int(), int(), int()
-TOTAL_TIME = 9000000
-TIMESTEP   = 0.05
-SNAPSHOTS  = int(TOTAL_TIME/TIMESTEP)
-CONST      = 1.0e+3
-DS         = 128
-MARGIN     = 34
+    print()
+    print("Timestep Delta: ", TIMESTEP)
+    print("Total Time    : ", TOTAL_TIME)
+    print("Snapshots     : ", SNAPSHOTS)
 
-print()
-print("Timestep Delta: ", TIMESTEP)
-print("Total Time    : ", TOTAL_TIME)
-print("Snapshots     : ", SNAPSHOTS)
+    # We cut the size of data for faster processing
+    Bx = Bx[0:DS, 0:DS, 0:DS]
+    By = By[0:DS, 0:DS, 0:DS]
+    Bz = Bz[0:DS, 0:DS, 0:DS]
+    x =   x[0:DS, 0:DS, 0:DS]
+    y =   y[0:DS, 0:DS, 0:DS]
+    z =   z[0:DS, 0:DS, 0:DS]
 
-# We cut the size of data for faster processing
-Bx = Bx[0:DS, 0:DS, 0:DS]
-By = By[0:DS, 0:DS, 0:DS]
-Bz = Bz[0:DS, 0:DS, 0:DS]
-x =   x[0:DS, 0:DS, 0:DS]
-y =   y[0:DS, 0:DS, 0:DS]
-z =   z[0:DS, 0:DS, 0:DS]
-
-print()
-
-reduction_factor = []
+    print()
 
 import random
 
@@ -110,91 +106,87 @@ else:
     max_cycles = 100
     print("max cycles:", max_cycles)
 
+reduction_factor = np.zeros(max_cycles)
 reduction_factor_at_gas_density = defaultdict()
 
+Margo = True
+
 while cycle < max_cycles:
-    
-    # this points contains several pocket, and it vanishes at the extremes.
-    """ 
-    point_i = 47.657
-    point_j = 81.482
-    point_k = 35.057
-    """
-    if True:
-        point_i = random.uniform(MARGIN, DS-MARGIN)
-        point_j = random.uniform(MARGIN, DS-MARGIN)
-        point_k = random.uniform(MARGIN, DS-MARGIN)
+    if Margo:
+        # this points contains several pocket, and it vanishes at the extremes.
+        """ 
+        point_i = 47.657
+        point_j = 81.482
+        point_k = 35.057
+        """
+        if True:
+            point_i = random.uniform(MARGIN, DS-MARGIN)
+            point_j = random.uniform(MARGIN, DS-MARGIN)
+            point_k = random.uniform(MARGIN, DS-MARGIN)
 
-    # random point has been selected, now we gotta follow field lines    
+        # random point has been selected, now we gotta follow field lines    
 
-    def trajectory(point_i, point_j, point_k, direction):    
+        def trajectory(point_i, point_j, point_k, direction):    
 
-        prev_pos = np.array([point_i, point_j, point_k])
-        cur_pos = np.array([point_i, point_j, point_k])   # initial position
+            prev_pos = np.array([point_i, point_j, point_k])
+            cur_pos = np.array([point_i, point_j, point_k])   # initial position
 
-        timestep = np.linspace(0, TOTAL_TIME, SNAPSHOTS + 1)  # start time, final_time, number of snapshots
-        delta = timestep[1] - timestep[0]                     # delta timestep
+            timestep = np.linspace(0, TOTAL_TIME, SNAPSHOTS + 1)  # start time, final_time, number of snapshots
+            delta = timestep[1] - timestep[0]                     # delta timestep
 
-        if direction == -1:
-            delta *= -1
+            if direction == -1:
+                delta *= -1
 
-        radius_vector = [cur_pos.tolist()]                      # all trajectory points
+            radius_vector = [cur_pos.tolist()]                      # all trajectory points
 
-        bfield_s = [interpolate_vector_field( cur_pos[0],  cur_pos[1],  cur_pos[2], Bx, By, Bz)]  # all trajectory points
+            bfield_s = [interpolate_vector_field( cur_pos[0],  cur_pos[1],  cur_pos[2], Bx, By, Bz)]  # all trajectory points
 
-        lin_seg = 0.0                                         #distance of path traveled (s)
-        bf_mag =  0.0                                         # magnetic field at s-distance
+            lin_seg = 0.0                                         #distance of path traveled (s)
+            bf_mag =  0.0                                         # magnetic field at s-distance
 
-        distance = []                                # acumulative pathdistances
-        bfield = []                             # magnetic field at each s-distance
+            distance = []                                # acumulative pathdistances
+            bfield = []                             # magnetic field at each s-distance
 
-        count = 0                                             # iterator count
+            count = 0                                             # iterator count
 
-        """# Calculating Trajectory"""
+            """# Calculating Trajectory"""
 
-        # We are looking into the two nearest critical points, so let's look at points were first derivative 
-        while all(ingrid(prev_pos[0], prev_pos[1], prev_pos[2])):
-            try:
-                    # print(count, lin_seg ,bf_mag)
-                    # B Field at current position and save
-                    Bp_run = np.array(interpolate_vector_field(cur_pos[0], 
-                                        cur_pos[1],  cur_pos[2], Bx, By, Bz))
-                    bfield_s.append(Bp_run)
-                    bf_mag = magnitude(Bp_run)
+            # We are looking into the two nearest critical points, so let's look at points were first derivative 
+            while all(ingrid(prev_pos[0], prev_pos[1], prev_pos[2])):
+                try:
+                        # print(count, lin_seg ,bf_mag)
+                        # B Field at current position and save
+                        Bp_run = np.array(interpolate_vector_field(cur_pos[0], 
+                                            cur_pos[1],  cur_pos[2], Bx, By, Bz))
+                        bfield_s.append(Bp_run)
+                        bf_mag = magnitude(Bp_run)
 
-                    # unit vector in field direction
-                    unito = Bp_run/bf_mag
-                    cur_pos += unito*delta
-                        
-                    radius_vector.append(cur_pos.tolist())                        
-            except:
-                print("Particle got out of the Grid")
-                break
+                        # unit vector in field direction
+                        unito = Bp_run/bf_mag
+                        cur_pos += unito*delta
+                            
+                        radius_vector.append(cur_pos.tolist())                        
+                except:
+                    print("Particle got out of the Grid")
+                    break
 
-            lin_seg +=  magnitude(cur_pos,  prev_pos) * scale_factor # centimeters
-            prev_pos =  cur_pos.copy()
+                lin_seg +=  magnitude(cur_pos,  prev_pos) * scale_factor # centimeters
+                prev_pos =  cur_pos.copy()
 
-            distance.append(lin_seg)
-            bfield.append(bf_mag)
+                distance.append(lin_seg)
+                bfield.append(bf_mag)
 
-            count += 1
-        
-        return (distance, radius_vector, bfield)
+                count += 1
+            
+            return (distance, radius_vector, bfield)
 
-    left_distance, left_radius_vector, left_bfield_magnitudes = trajectory(point_i, point_j, point_k, -1)
-    right_distance,right_radius_vector, right_bfield_magnitudes = trajectory(point_i, point_j, point_k, 1)
+        left_distance, left_radius_vector, left_bfield_magnitudes = trajectory(point_i, point_j, point_k, -1)
+        right_distance,right_radius_vector, right_bfield_magnitudes = trajectory(point_i, point_j, point_k, 1)
 
-     # this [1:] cut is because both lists contain the initial point
-    distance = list(reversed(left_distance)) + right_distance[1:]
-    radius_vector = list(reversed(left_radius_vector)) + right_radius_vector[1:]
-    bfield        = list(reversed(left_bfield_magnitudes)) + right_bfield_magnitudes[1:]
-
-    #print()
-    #print(f"Initial Position: {cur_pos}, Timestep: {delta}\n")
-    #print("Integration: from ", radius_vector[0], "--> to ", radius_vector[-1])
-
-    #print("Min, Max of B in trayectory: ", min_bp, max_bp)
-
+        # this [1:] cut is because both lists contain the initial point
+        distance = list(reversed(left_distance)) + right_distance[1:]
+        radius_vector = list(reversed(left_radius_vector)) + right_radius_vector[1:]
+        bfield        = list(reversed(left_bfield_magnitudes)) + right_bfield_magnitudes[1:]
 
     """# Obtained position along the field lines, now we find the pocket"""
 

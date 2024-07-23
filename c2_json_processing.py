@@ -15,32 +15,9 @@ with open(file_path, 'r') as file:
     # Load the JSON data into a Python list
     reduction_factor = json.load(file)
 
-# Assuming your JSON file is named 'data.json'
-file_path = 'random_distributed_gas_density.json'
-
-# Open the file in read mode
-with open(file_path, 'r') as file:
-    # Load the JSON data into a Python list
-    gas_density = json.load(file)
-
 print(len(reduction_factor))
 
-red_fact_count = Counter(reduction_factor)
-inv_red_fact_count = Counter(reduction_factor)
-
 bins = len(reduction_factor)//10
-
-dic_gas_r = {}
-for gas, R in zip(gas_density, reduction_factor):
-    print(gas, 1/R)
-    dic_gas_r[gas] = R
-
-ordered_dict_gas_r = OrderedDict(sorted(dic_gas_r.items()))
-
-del gas_density, dic_gas_r
-
-reduction_f = list(ordered_dict_gas_r.values() )
-gas_density = list(ordered_dict_gas_r.keys())
 
 # Assuming you have defined reduction_factor and bins already
 
@@ -71,6 +48,26 @@ plt.tight_layout()
 plt.savefig(f"c_output_data/json_processing_histogramdata={len(reduction_factor)}bins={bins}.png")
 
 plt.show()
+
+# Assuming your JSON file is named 'data.json'
+file_path = 'random_distributed_gas_density.json'
+
+# Open the file in read mode
+with open(file_path, 'r') as file:
+    # Load the JSON data into a Python list
+    gas_density = json.load(file)
+
+dic_gas_r = {}
+for gas, R in zip(gas_density, reduction_factor):
+    print(gas, 1/R)
+    dic_gas_r[gas] = R
+
+ordered_dict_gas_r = OrderedDict(sorted(dic_gas_r.items()))
+del gas_density, dic_gas_r
+
+gas_density = list(ordered_dict_gas_r.keys())
+reduction_f = list(ordered_dict_gas_r.values() )
+
 
 from scipy import stats
 

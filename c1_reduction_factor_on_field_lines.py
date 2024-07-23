@@ -39,9 +39,65 @@ def process_line(line):
     else:
         return None
 
-# Specify the file path
-#file_path = 'critical_points.txt'
+def pocket_finder(bmag, cycle=0, plot =False):
+    """  
+    j = i+1 > i
+    """
+    Bj = bmag[0]
+    Bi = 0.0
+    lindex = []
+    lpeaks = []
+    for B in bmag:
+        Bj = B
+        if Bj < Bi and (len(lpeaks) == 0 or Bi > lpeaks[-1] ): # if True, then we have a peak
+            index = np.where(bmag==Bi)[0][0]
+            lindex.append(index)
+            lpeaks.append(Bi)
+        Bi = B
+    Bj = bmag[-1]
+    Bi = 0.0
+    rindex = []
+    rpeaks = []
+    for B in reversed(bmag):
+        Bj = B
+        if Bj < Bi and (len(rpeaks) == 0 or Bi > rpeaks[-1]): # if True, then we have a peak
+            index = np.where(bmag==Bi)[0][0]
+            rindex.append(index)
+            rpeaks.append(Bi)
+        Bi = B
+    peaks = lpeaks + list(reversed(rpeaks))[1:]
+    indexes = lindex+list(reversed(rindex))[1:] 
+    baseline = min(bmag)
+    upline = max(bmag)
+    index_global_max = np.where(bmag==upline)[0][0]
+    
+    if plot:
+        # Create a figure and axes for the subplot layout
+        fig, axs = plt.subplots(1, 1, figsize=(8, 6))
 
+        axs.plot(bmag)
+        axs.plot(indexes,peaks, "x", color="green")
+        axs.plot(indexes,peaks, ":", color="green")
+        axs.plot(index_global_max, upline, "x", color="black")
+        axs.plot(np.ones_like(bmag)*baseline, "--", color="gray")
+        axs.set_xlabel("Index")
+        axs.set_ylabel("Field")
+        axs.set_title("Actual Field Shape")
+        axs.legend(["bmag", "all peaks", "index_global_max", "baseline"])
+        axs.grid(True)
+
+
+        # Adjust layout to prevent overlap
+        plt.tight_layout()
+
+        # Save the figure
+        plt.savefig(f"c_output_data/c_output_field_shape{cycle}.png")
+
+        # Show the plot
+        plt.show()
+    return (indexes, peaks), (index_global_max, upline)
+
+# Specify the file path
 file_path = sys.argv[1]
 
     # Displaying a message about reading from the file
@@ -62,6 +118,11 @@ for iter in data_list: # Data into variables
     itera.append(iter['iteration'])
     distance.append(iter['trajectory'])
     bfield.append(iter['field magnitude'])
+
+itera = np.array(itera)
+distance = np.array(distance)
+bfield = np.array(bfield)
+
 print(" Data Successfully Loaded")
 
 reduction_factor_at_s = []

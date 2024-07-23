@@ -144,7 +144,7 @@ if True:
 
 
 """  
-Finished Field Lines Integration: loaded data into c_field_lines.txt
+Finished Field Lines Integration: saved data into c_field_lines.txt
 
 """
 
@@ -182,46 +182,32 @@ Jstar = 2.4e+15*(1.0e+6)**(0.1)/(Enot**2.8)
 
 # Energy scale for cosmic rays (1 MeV = 1e+6 eV)
 Estar = 1.0e+6
-Epion = 280e+6
-
 
 """ 
 Ionization Calculation
 
 - [x] Integrate over the trajectory to obtain column density
-- [ ] Integrate over all posible energies E in \[1 MeV, 1 GeV\]
-- [ ] Integrate over all posible values of pitch angle d(cos(alpha_i)) with alpha_i in \[0, pi/2\]
+- [x] Integrate over all posible energies E in \[1 MeV, 1 GeV\]
+- [x] Integrate over all posible values of pitch angle cosine
 - [ ] Add all three CR populations
 
 """
 energy = np.array([1.0e+2*(10)**(14*k/size) for k in range(size)])  # Energy values from 1 to 10^15
-diff_energy = np.array([(10)**(14*k/size) for k in range(size)])
-logenergy = np.log10(energy)                                        # log10(Energy) values from 0 to 15
+diff_energy = np.array([energy[k]-energy[k-1] for k in range(len(energy))])
+diff_energy[0] = energy[0]
 column_density = np.array([1.0e+19*(10)**(8*k/size) for k in range(size)])
 
 print("Extremes of Independent N ", np.log10(column_density[0]), np.log10(column_density[-1]))
 
 """ 
 # Column Density as Independent Variable
-Using Lists
+
+Using Numpy Arrays
+
 """
 
 # for one value of \mu only
-log_lossE = []
-log_lossEi = []
-proton_local_spectrum = []
-log_proton_ism_spectrum = []
-low_energy_proton_ism_spectrum = []
-forward_spectrum = []
-integrand_jl = {}
-proton_spectrum = 0.0
-ism_spectrum = 0.0
 zeta_N  = 0.0
-
-log_proton_spectrum = lambda E: np.log10(C) + 0.1*np.log10(E) - 2.8*np.log10(Enot + E) # J_p as in (Ivlev, 2015), Padovani et al equation (1)
-proton_spectrum = lambda E: C*E**0.1/(Enot + E)**2.8
-log_ism_spectrum = lambda x: np.log10(Jstar) + a*(np.log10(x) - np.log10(Estar))
-log_loss_function = lambda z: np.log10(Lstar) - d*(np.log10(z) - np.log10(Estar) )
 
 ism_spectrum = lambda x: Jstar*(x/Estar)**a
 loss_function = lambda z: Lstar*(Estar/z)**d
@@ -238,16 +224,15 @@ for j, Nj in enumerate(column_density): # will go from 3,4,5,6--- almost in inte
 
         isms = ism_spectrum(Ei)            # log_10(j_i(E_i))
         llei = loss_function(Ei)           # log_10(L(E_i))
-        jl_dE += isms*llei*diff_energy[k] # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
+        jl_dE += isms*llei*diff_energy[k]  # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
         
-    zeta_N = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
+        Jacobian = 1.0
+
+    zeta_N = Jacobian * jl_dE / epsilon                 # \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
+
     log_ion[j] = np.log10(zeta_N)
 
 print("Extremes of zeta(N) Padovani et al: ", log_ion[0], log_ion[-1])
-
-integrand_forward_jl = {}
-forward_logz = []
-
 
 """ 
 # Import Column Densities for Forward and Backward Moving Particles
@@ -260,7 +245,6 @@ mu_ism_x_diff = mu_ism*diff_mu_ism
 
 ForwardColumn  = np.array(np.load("ForwardColumn.npy", mmap_mode='r'))
 BackwardColumn = np.array(np.load("BackwardColumn.npy", mmap_mode='r'))
-
 
 if False:
     import matplotlib.cm as cm
@@ -297,9 +281,11 @@ c = (len(mu_ism), len(ForwardColumn[0,:])) #ForwardColumn[0,:] = ForwardColumn[m
 log_forward_ion = np.zeros(c)
 
 for i, mui in enumerate(mu_ism):
-    print(i, mui)
+
     for j, Nj in enumerate(ForwardColumn[i,:]): 
+    
         jl_dE = 0.0
+    
         for k, E in enumerate(energy): # will go from 3,4,5,6--- almost in integers#
 
             Ei = ((E)**(1 + d) + (1 + d) * Lstar* Estar**(d)* Nj)**(1 / (1 + d)) # E_i(E, N)
@@ -307,8 +293,17 @@ for i, mui in enumerate(mu_ism):
             isms = ism_spectrum(Ei)            # log_10(j_i(E_i))
             llei = loss_function(Ei)           # log_10(L(E_i))
             jl_dE += isms*llei*diff_energy[k] # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
-            
-        zeta_Ni = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
+        
+        """
+             if 1 - (bfield[j]/bfield[0])*(1 - mui**2) > 0:
+                mu_local = np.sqrt(1 - (bfield[j]/bfield[0])*(1 - mui**2))
+                Jacobian = (mui/mu_local)*(bfield[j]/bfield[0])    
+            else:
+                Jacobian = 0.0
+                break
+            Jacobian = 1.0 
+        """
+        zeta_Ni = jl_dE / epsilon  # jacobian * jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
 
         log_forward_ion[i,j] = np.log10(zeta_Ni)
 
@@ -330,7 +325,7 @@ c = (len(mu_ism), len(BackwardColumn[0,:]))
 log_backward_ion  = np.zeros(c)
 
 for i, mui in enumerate(-1*mu_ism):
-    print(i, mui)
+
     for j, Nj in enumerate(BackwardColumn[i,:]): # will go from 3,4,5,6--- almost in integers#
 
         jl_dE = 0.0
@@ -342,15 +337,21 @@ for i, mui in enumerate(-1*mu_ism):
             isms  = ism_spectrum(Ei)            # log_10(j_i(E_i))
             llei  = loss_function(Ei)           # log_10(L(E_i))
             jl_dE += isms*llei*diff_energy[k]   # j_i(E_i)L(E_i) = 10^{log_10(j_i(E_i)) + log_10(L(E_i))}
-            
-        zeta_Ni = jl_dE/epsilon #jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
-        
+        """             
+            if 1 - (bfield[j]/bfield[0])*(1 - mui**2) > 0:
+                mu_local = np.sqrt(1 - (bfield[j]/bfield[-1])*(1 - mui**2))
+                Jacobian = (mui/mu_local)*(bfield[j]/bfield[-1])
+            else:
+                Jacobian = 0.0
+                break
+            Jacobian = 1.0
+         """
+        zeta_Ni = jl_dE / epsilon  # jacobian * jl_dE/epsilon #  \sum_k j_i(E_i)L(E_i) \Delta E_k / \epsilon
         log_backward_ion[i,j] = np.log10(zeta_Ni)
 
 print("Extremes of zeta(N, \mu=1) backward", log_backward_ion[0,0], log_backward_ion[0,-1])
 
 backward_ion_differential = np.transpose(10**log_backward_ion)*diff_mu_ism
-
 b_overall_ionization = np.log10(np.sum(backward_ion_differential, axis=1))
 
 print("log10(zeta_-(s,mu))\n",log_backward_ion)
@@ -374,24 +375,41 @@ pairs, (index_global_max, upline) = pocket_finder(bfield, 0, plot=False)
 total_ionization = np.log10(10**f_overall_ionization + 10**b_overall_ionization[::-1])
 
 """  
-\mathcal{L} Model: Protons
+\mathcal{L} & \mathcal{H} Model: Protons
 
 """
-model_L = [-3.331056497233e+6, 1.207744586503e+6,-1.913914106234e+5,
-            1.731822350618e+4,-9.790557206178e+2, 3.543830893824e+1, 
-           -8.034869454520e-1, 1.048808593086e-2,-6.188760100997e-5, 
+model_H = [1.001098610761e7, -4.231294690194e6,  7.921914432011e5,
+          -8.623677095423e4,  6.015889127529e3, -2.789238383353e2,
+           8.595814402406e0, -1.698029737474e-1, 1.951179287567e-3,
+          -9.937499546711e-6
+]
+
+
+model_L = [-3.331056497233e+6,  1.207744586503e+6,-1.913914106234e+5,
+            1.731822350618e+4, -9.790557206178e+2, 3.543830893824e+1, 
+           -8.034869454520e-1,  1.048808593086e-2,-6.188760100997e-5, 
             3.122820990797e-8]
 
-logz = []
+logzl = []
 
 for i,Ni in enumerate(column_density):
-    lz = sum( [cj*(np.log10(Ni))**j for j, cj in enumerate(model_L)] )
-    logz.append(lz)
-    difflogfit = (0.0)
+    lzl = sum( [cj*(np.log10(Ni))**j for j, cj in enumerate(model_L)] )
+    logzl.append(lzl)
 
-print("Extremes of fitting zeta(N) ", logz[0], logz[-1])
+print("Extremes of fitting zeta(N) ", logzl[0], logzl[-1])
 
-logzetafit = np.array(logz)
+logzetalfit = np.array(logzl)
+
+logzh = []
+
+for i,Ni in enumerate(column_density):
+    lzh = sum( [cj*(np.log10(Ni))**j for j, cj in enumerate(model_H)] )
+    logzh.append(lzh)
+
+print("Extremes of fitting zeta(N) ", logzh[0], logzh[-1])
+
+logzetahfit = np.array(logzh)
+
 svnteen = np.ones_like(column_density)*(-17)
 
 """  
@@ -407,6 +425,7 @@ Free Streaming Cosmic Rays, Analytical Expression (Silsbee & Ivlev, 2019)
 
 """
 fig, axs = plt.subplots(2, 2, figsize=(10,10))  # Create a 2x2 grid of subplots
+
 If = {
     "a=0.4": 5.14672,
     "a=0.5": 3.71169,
@@ -427,14 +446,15 @@ for c, (b, I) in zip(colors, If.items()):
     gammaf = (a + d - 1) / (1 + d)
     
     for Ni in column_density:
-        fs_ionization = (1 / epsilon) * (1 + d) / (a + 2 * d) * Jstar * Lstar * Estar * I * (Ni / Nof) ** (-gammaf)
+        fs_ionization = 4*np.pi*(1 / epsilon) * (1 + d) / (a + 2 * d) * Jstar * Lstar * Estar * I * (Ni / Nof) ** (-gammaf)
         free_streaming_ion.append(np.log10(fs_ionization))
     
     axs[0, 0].plot(column_density, free_streaming_ion, label=f'$log(\zeta_f(N, a={a}))$', linestyle="--", color=c)
     axs[0, 0].text(column_density[-1], free_streaming_ion[-1], f'a={a}, $\gamma_f$={gammaf:.2f}', fontsize=10, color=c)
 
 # Plot Ionization vs Column Density (First plot)
-axs[0,0].plot(column_density, logzetafit, label='$log_{10}(\zeta) \, (\mathrm{Padovani \, et \, al})$', linestyle="--", color="grey")
+axs[0,0].plot(column_density, logzetalfit, label='$\mathcal{L}$', linestyle="--", color="grey")
+axs[0,0].plot(column_density, logzetahfit, label='$\mathcal{H}$', linestyle="--", color="dimgrey")
 axs[0,0].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="-", color="black")
 axs[0,0].plot(column_density, svnteen, label='$\zeta = 10^{-17}$', linestyle=":", color="dimgrey")
 axs[0,0].set_xscale('log')
@@ -465,30 +485,30 @@ colors = cm.rainbow(np.linspace(0, 1, len(mu_ism)))
 for i, c in enumerate(colors):
     axs[1,0].scatter(ForwardColumn[i,:], log_forward_ion[i,:], label=f'$\zeta(mu_i={mu_ism[i]})$', marker="|", color=c, s=5)
 
-axs[1,0].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="--", color="dimgrey")
+axs[1,0].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="--", color="black")
 axs[1,0].set_xscale('log')
-axs[1,0].set_xlabel('$N(s_f - s_{rev})$ (log scale)')
-axs[1,0].set_ylabel('$\zeta_-(N(s_f - s_{rev}))$ (log scale)')
+axs[1,0].set_xlabel('$N(s)$ (log scale)')
+axs[1,0].set_ylabel('$\zeta_+(N(s))$ (log scale)')
+axs[1,0].grid(True)
 #axs[1,0].legend()
 #axs[1,0].set_ylim([-16, -15])
-axs[1,0].grid(True)
+
 
 svnteen = np.ones_like(BackwardColumn[-1,:])*(-15)
-
 colors = cm.rainbow(np.linspace(0, 1, len(mu_ism)))
 
+# Plot Spectrum L(E) vs Energy (Fourth plot)
 for i, c in enumerate(colors):
     axs[1,1].scatter(BackwardColumn[i,:], log_backward_ion[i,:], label=f'$\zeta(mu_i={-mu_ism[i]})$', marker="|", color=c, s=5)
-# Plot Spectrum L(E) vs Energy (Fourth plot)
-axs[1,1].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="--", color="dimgrey")
+
+axs[1,1].plot(column_density, log_ion, label='$log_{10}(\zeta_{\int dE})$', linestyle="--", color="black")
 axs[1,1].set_xscale('log')
 axs[1,1].set_xlabel('$N(s)$ (log scale)')
-axs[1,1].set_ylabel('$\zeta_+(N(s))$ (log scale)')
+axs[1,1].set_ylabel('$\zeta_-(N(s))$ (log scale)')
+axs[1,1].grid(True)
 #axs[1,1].legend()
 #axs[1,1].set_ylim([-16, -15])
-axs[1,1].grid(True)
 
-fig.tight_layout(pad=2.0)
+#fig.tight_layout(pad=2.0)
 plt.savefig("b_output_data/b_ionizations.png")
-
 #plt.show()

@@ -4,10 +4,10 @@ b_output*
 c_output*
 d_input_data*
 input_data
+Jakar*
 
 # virtual env/bash scripts
-b_submit.sh
-c_submit.sh
+*submit.sh
 jakar-venv*
 venv
 .vscode
@@ -26,4 +26,6 @@ test.py
 # data files
 *.json
 c_field_lines.txt
-
+margo*/
+arepo*/
+*.npy

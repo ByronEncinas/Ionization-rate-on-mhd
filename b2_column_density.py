@@ -8,32 +8,32 @@ import numpy as np
 Declaring and Importing Important Parameters
 
 """
-gas_den = np.array(np.load("input_data/gas_number_density.npy", mmap_mode='r'))
+gas_den = np.array(np.load("margo_input_data/gas_number_density.npy", mmap_mode='r'))
 
 if True: # import data colapse to see statements
     # magnetic field in [x,y,z]
-    Bx = np.array(np.load("input_data/magnetic_field_x.npy", mmap_mode='r'))
-    By = np.array(np.load("input_data/magnetic_field_y.npy", mmap_mode='r'))
-    Bz = np.array(np.load("input_data/magnetic_field_z.npy", mmap_mode='r'))
+    Bx = np.array(np.load("margo_input_data/magnetic_field_x.npy", mmap_mode='r'))
+    By = np.array(np.load("margo_input_data/magnetic_field_y.npy", mmap_mode='r'))
+    Bz = np.array(np.load("margo_input_data/magnetic_field_z.npy", mmap_mode='r'))
 
     # using .npy data
     # Mesh Grid in Space
-    x = np.array(np.load("input_data/coordinates_x.npy", mmap_mode='r'))
-    y = np.array(np.load("input_data/coordinates_y.npy", mmap_mode='r'))
-    z = np.array(np.load("input_data/coordinates_z.npy", mmap_mode='r'))
+    x = np.array(np.load("margo_input_data/coordinates_x.npy", mmap_mode='r'))
+    y = np.array(np.load("margo_input_data/coordinates_y.npy", mmap_mode='r'))
+    z = np.array(np.load("margo_input_data/coordinates_z.npy", mmap_mode='r'))
 
     # Velocity Dispersion
-    # vel_disp = np.array(np.load("input_data/velocity_dispersion.npy", mmap_mode='r'))
+    # vel_disp = np.array(np.load("margo_input_data/velocity_dispersion.npy", mmap_mode='r'))
 
     # this is temperature in [x,y,z]
-    # temp = np.array(np.load("input_data/Temperature.npy", mmap_mode='r'))
+    # temp = np.array(np.load("margo_input_data/Temperature.npy", mmap_mode='r'))
 
     # Cosmic Ray Density
-    # cr_den = np.array(np.load("input_data/cr_energy_density.npy", mmap_mode='r'))
+    # cr_den = np.array(np.load("margo_input_data/cr_energy_density.npy", mmap_mode='r'))
 
     # Molecular Cloud Density
     # Ion Fraction
-    # ion_frac = np.array(np.load("input_data/ionization_fraction.npy", mmap_mode='r'))
+    # ion_frac = np.array(np.load("margo_input_data/ionization_fraction.npy", mmap_mode='r'))
 
 if True: # scale factor to convert grid index fractions into real distances in cm
     """  
@@ -151,13 +151,13 @@ ds = abs(distance[1] - distance[0]) # they are equally space (unito * delta)
 
 s = np.random.uniform(0,1,2)
 #mu_ism    = np.flip(sorted(np.exp(-abs(s))))
-mu_ism = np.flip(np.logspace(-3,0,1000))
+mu_ism = np.flip(np.logspace(-3,0,50))
 
 np.save("PitchAngleCosines.npy", mu_ism)
 
 c = (len(mu_ism), len(distance))
-Nforward  = np.zeros(c)
 
+Nforward  = np.zeros(c)
 B_ism     = bfield[0]
 
 for i, mui_ism in enumerate(mu_ism):
@@ -169,8 +169,10 @@ for i, mui_ism in enumerate(mu_ism):
         num_den_j = interpolate_scalar_field(gaspos[0], gaspos[1], gaspos[2], gas_den)  # Interpolated gas density order of 1.0^0      
         Bsprime   = bfield[j]
         deno      = 1 - (Bsprime/B_ism) * (1 - mui_ism**2)
+
+        deno_mu_local = 1 - (bfield[j]/bfield[0])*(1 - mui_ism**2)
         
-        if deno < 0:
+        if deno < 0 or deno_mu_local < 0:
             """ 
             1 - (Bsprime/B_ism) * (1 - muj_ism**2) < 0
             """
@@ -204,7 +206,9 @@ for i, mui_ism in enumerate(mu_ism):
         Bsprime   = rev_bfield[j]
         deno      = 1 - (Bsprime/B_ism) * (1 - mui_ism**2)
         
-        if deno < 0:
+        deno_mu_local = 1 - (bfield[j]/bfield[-1])*(1 - mui_ism**2)
+        
+        if deno < 0 or deno_mu_local < 0:    
             """ 
             1 - (Bsprime/B_ism) * (1 - muj_ism**2) < 0
             """
